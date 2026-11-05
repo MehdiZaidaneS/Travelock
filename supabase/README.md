@@ -1,5 +1,10 @@
 # Supabase starter connection check
 
+The database structure and policies are recorded in
+`migrations/20261105000000_locations_and_destinations.sql`.
+**Do not run this migration against our existing shared database.**
+It is for recreating the setup in a new database.
+
 1. Add your project settings to the root `local.properties`, preserving `sdk.dir`:
 
    ```properties
