@@ -3,6 +3,7 @@ package com.example.travelock.data
 import com.example.travelock.BuildConfig
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.postgrest.Postgrest
+import io.github.jan.supabase.auth.Auth
 
 object SupabaseProvider {
     val client by lazy {
@@ -14,6 +15,7 @@ object SupabaseProvider {
             supabaseKey = BuildConfig.SUPABASE_PUBLISHABLE_KEY,
         ) {
             install(Postgrest)
+            install(Auth)
         }
     }
 }
