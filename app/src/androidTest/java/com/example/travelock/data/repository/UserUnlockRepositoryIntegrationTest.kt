@@ -7,6 +7,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.example.travelock.data.SupabaseProvider
 import com.example.travelock.data.model.Destination
 import com.example.travelock.data.model.UserUnlock
+import com.example.travelock.data.model.VisitAttempt
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.postgrest.from
@@ -87,6 +88,19 @@ class UserUnlockRepositoryIntegrationTest {
             assertNull(visit.photoPath)
             assertEquals(ownUnlocks.toSet(), repository.getMyUnlocks().toSet())
 
+            suspend fun assertVisitStillPending() {
+                val saved = supabase.from("visit_attempts").select {
+                    filter { eq("visit_id", visit.visitId) }
+                }.decodeSingle<VisitAttempt>()
+                assertNull("A rejected completion must leave the attempt pending.", saved.completedAt)
+                assertNull("A rejected completion must not attach a photo.", saved.photoPath)
+                assertEquals(ownUnlocks.toSet(), repository.getMyUnlocks().toSet())
+            }
+
+            val attemptsBeforeInvalidQr = supabase.from("visit_attempts").select {
+                filter { eq("user_id", user.id) }
+            }.decodeList<VisitAttempt>().toSet()
+
             try {
                 repository.startVisit("INVALID-TEST-${UUID.randomUUID()}")
                 fail("An unknown QR code must be rejected by the database.")
@@ -94,6 +108,14 @@ class UserUnlockRepositoryIntegrationTest {
                 assertEquals("22023", error.code)
                 assertTrue(error.message.orEmpty().contains("Invalid QR code."))
             }
+            assertEquals(
+                "An invalid QR must not create an attempt.",
+                attemptsBeforeInvalidQr,
+                supabase.from("visit_attempts").select {
+                    filter { eq("user_id", user.id) }
+                }.decodeList<VisitAttempt>().toSet(),
+            )
+            assertVisitStillPending()
 
             try {
                 repository.completeVisit(
@@ -107,6 +129,7 @@ class UserUnlockRepositoryIntegrationTest {
                 assertEquals("22023", error.code)
                 assertTrue(error.message.orEmpty().contains("Upload a photo"))
             }
+            assertVisitStillPending()
 
             // A small synthetic JPEG tests Storage/API wiring, not live camera capture.
             // The private uploaded test photo and completed attempt are kept afterward.
@@ -123,11 +146,15 @@ class UserUnlockRepositoryIntegrationTest {
             val photoPath = VisitPhotoRepository().uploadPhoto(visit, photoBytes)
             assertTrue(photoPath.startsWith("${user.id}/${visit.visitId}/"))
 
+            // Just beyond the boundary, rather than only testing a distant city.
+            val latitudeOffset = Math.toDegrees(51.0 / 6_371_000.0)
+            val outsideLatitude = destination.latitude +
+                if (destination.latitude >= 0) -latitudeOffset else latitudeOffset
             try {
                 repository.completeVisit(
                     visit.visitId,
                     photoPath,
-                    if (destination.latitude > 0) destination.latitude - 1 else destination.latitude + 1,
+                    outsideLatitude,
                     destination.longitude,
                 )
                 fail("Completing a visit far from the destination must be rejected.")
@@ -135,6 +162,9 @@ class UserUnlockRepositoryIntegrationTest {
                 assertEquals("22023", error.code)
                 assertTrue(error.message.orEmpty().contains("within 50 metres"))
             }
+            // Check before the successful retry: rejection must not partially save
+            // completion details or alter an existing unlock.
+            assertVisitStillPending()
 
             val completed = repository.completeVisit(
                 visit.visitId, photoPath, destination.latitude, destination.longitude,
