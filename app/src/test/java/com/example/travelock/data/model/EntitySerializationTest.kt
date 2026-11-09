@@ -13,6 +13,36 @@ class EntitySerializationTest {
     private val json = Json { ignoreUnknownKeys = true }
 
     @Test
+    fun visitAttemptDecodesPendingAndCompletedDatabaseResponses() {
+        val pending = json.decodeFromString<VisitAttempt>(
+            """
+            {
+              "visit_id": "visit-1", "user_id": "user-1", "destination_id": "destination-1",
+              "started_at": "2026-11-09T15:00:00.123456+00:00",
+              "completed_at": null, "photo_path": null
+            }
+            """.trimIndent(),
+        )
+        assertEquals(Instant.parse("2026-11-09T15:00:00.123456Z"), pending.startedAt)
+        assertNull(pending.completedAt)
+        assertNull(pending.photoPath)
+
+        val completed = json.decodeFromString<VisitAttempt>(
+            """
+            {
+              "visit_id": "visit-1", "user_id": "user-1", "destination_id": "destination-1",
+              "started_at": "2026-11-09T15:00:00.123456+00:00",
+              "completed_at": "2026-11-09T15:01:00+00:00",
+              "photo_path": "user-1/visit-1/photo.jpg"
+            }
+            """.trimIndent(),
+        )
+        assertEquals(Instant.parse("2026-11-09T15:01:00Z"), completed.completedAt)
+        assertEquals("user-1/visit-1/photo.jpg", completed.photoPath)
+        assertEquals(completed, json.decodeFromString<VisitAttempt>(json.encodeToString(completed)))
+    }
+
+    @Test
     fun locationDecodesRelatedDestinationAndPercentageDiscount() {
         val location = json.decodeFromString<Location>(
             """

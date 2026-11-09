@@ -1,5 +1,7 @@
 package com.example.travelock.data.repository
 
+import android.graphics.Bitmap
+import android.graphics.Color
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.example.travelock.data.SupabaseProvider
@@ -10,8 +12,10 @@ import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.exception.PostgrestRestException
 import java.util.UUID
+import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
@@ -75,22 +79,73 @@ class UserUnlockRepositoryIntegrationTest {
                 }
                 .decodeSingle<Destination>()
             val repository = UserUnlockRepository()
-            val firstScan = repository.unlockDestination(destination.qrCode)
-            val repeatedScan = repository.unlockDestination(destination.qrCode)
-
-            // The seeded unlock must keep its ID, owner, destination and timestamp.
-            assertEquals(visibleUnlocks.single(), firstScan)
-            assertEquals(firstScan, repeatedScan)
+            // Starting creates a pending attempt, but must not award an unlock.
+            val visit = repository.startVisit(destination.qrCode)
+            assertEquals(user.id, visit.userId)
+            assertEquals(destinationId, visit.destinationId)
+            assertNull(visit.completedAt)
+            assertNull(visit.photoPath)
+            assertEquals(ownUnlocks.toSet(), repository.getMyUnlocks().toSet())
 
             try {
-                repository.unlockDestination("INVALID-TEST-${UUID.randomUUID()}")
+                repository.startVisit("INVALID-TEST-${UUID.randomUUID()}")
                 fail("An unknown QR code must be rejected by the database.")
             } catch (error: PostgrestRestException) {
                 assertEquals("22023", error.code)
                 assertTrue(error.message.orEmpty().contains("Invalid QR code."))
             }
 
-            // Neither a repeated scan nor a rejected code should change the unlocks.
+            try {
+                repository.completeVisit(
+                    visitId = visit.visitId,
+                    photoPath = "${user.id}/${visit.visitId}/missing.jpg",
+                    latitude = destination.latitude,
+                    longitude = destination.longitude,
+                )
+                fail("Completing a visit without an uploaded photo must be rejected.")
+            } catch (error: PostgrestRestException) {
+                assertEquals("22023", error.code)
+                assertTrue(error.message.orEmpty().contains("Upload a photo"))
+            }
+
+            // A small synthetic JPEG tests Storage/API wiring, not live camera capture.
+            // The private uploaded test photo and completed attempt are kept afterward.
+            val bitmap = Bitmap.createBitmap(8, 8, Bitmap.Config.ARGB_8888)
+            val photoBytes = try {
+                bitmap.eraseColor(Color.BLUE)
+                ByteArrayOutputStream().use { output ->
+                    check(bitmap.compress(Bitmap.CompressFormat.JPEG, 90, output))
+                    output.toByteArray()
+                }
+            } finally {
+                bitmap.recycle()
+            }
+            val photoPath = VisitPhotoRepository().uploadPhoto(visit, photoBytes)
+            assertTrue(photoPath.startsWith("${user.id}/${visit.visitId}/"))
+
+            try {
+                repository.completeVisit(
+                    visit.visitId,
+                    photoPath,
+                    if (destination.latitude > 0) destination.latitude - 1 else destination.latitude + 1,
+                    destination.longitude,
+                )
+                fail("Completing a visit far from the destination must be rejected.")
+            } catch (error: PostgrestRestException) {
+                assertEquals("22023", error.code)
+                assertTrue(error.message.orEmpty().contains("within 50 metres"))
+            }
+
+            val completed = repository.completeVisit(
+                visit.visitId, photoPath, destination.latitude, destination.longitude,
+            )
+            val repeated = repository.completeVisit(
+                visit.visitId, photoPath, destination.latitude, destination.longitude,
+            )
+            assertEquals(visibleUnlocks.single(), completed)
+            assertEquals(completed, repeated)
+
+            // The existing fixture keeps its original unlock ID and timestamp.
             assertEquals(ownUnlocks.toSet(), repository.getMyUnlocks().toSet())
         } finally {
             supabase.auth.signOut()
