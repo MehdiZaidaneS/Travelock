@@ -31,13 +31,13 @@ class VisitCompletionCoordinator internal constructor(
     suspend fun completeCapturedVisit(
         visit: VisitAttempt,
         jpegBytes: ByteArray,
-        onPhotoUploaded: (String) -> Unit = {},
+        onPhotoUploaded: suspend (String) -> Unit = {},
     ): VisitCompletionResult {
         require(jpegBytes.isNotEmpty()) { "The visit photo cannot be empty." }
         require(jpegBytes.size <= 10 * 1024 * 1024) { "The visit photo must be at most 10 MiB." }
 
         return completeWithPhoto(visit) {
-            uploadPhoto(visit, jpegBytes).also(onPhotoUploaded)
+            uploadPhoto(visit, jpegBytes).also { onPhotoUploaded(it) }
         }
     }
 

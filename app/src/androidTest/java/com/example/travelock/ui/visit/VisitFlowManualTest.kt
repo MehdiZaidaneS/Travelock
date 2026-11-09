@@ -18,10 +18,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.test.platform.app.InstrumentationRegistry
@@ -65,6 +67,10 @@ class VisitFlowManualTest {
         assumeTrue("Set manualVisitTest=true to run this interactive test.",
             arguments.getString("manualVisitTest") == "true")
         val testRetry = arguments.getString("manualVisitRetryTest") == "true"
+        val testRestore = arguments.getString("manualVisitRestoreTest") == "true"
+        val testReopen = arguments.getString("manualVisitReopenTest") == "true"
+        require(!testReopen || testRetry) { "Reopen test also needs manualVisitRetryTest=true." }
+        require(!testRestore || testRetry) { "Restoration test also needs manualVisitRetryTest=true." }
         val email = requireNotNull(arguments.getString("supabaseTestEmail")) {
             "Add the local supabaseTestEmail instrumentation argument."
         }
@@ -83,11 +89,17 @@ class VisitFlowManualTest {
                 "The test destination no longer exists."
             }
             val repository = UserUnlockRepository()
-            val startedVisit = AtomicReference<VisitAttempt?>(null)
+            val progressStore = VisitProgressStore(InstrumentationRegistry.getInstrumentation().targetContext)
+            val initialProgress = progressStore.load(user.id)
+            require(initialProgress.visit == null || initialProgress.visit.destinationId == destinationId) {
+                "A saved visit belongs to a different destination. Use its test destination first."
+            }
+            val resuming = initialProgress.uploadedPhotoPath != null
+            val startedVisit = AtomicReference(initialProgress.visit)
             val uploads = AtomicInteger()
-            val uploadedPath = AtomicReference<String?>(null)
+            val uploadedPath = AtomicReference(initialProgress.uploadedPhotoPath)
             val expectedRejection = AtomicBoolean(false)
-            var firstCompletion = true
+            var firstCompletion = !resuming
             val coordinator = VisitCompletionCoordinator(
                 getLocation = DeviceLocationProvider(
                     InstrumentationRegistry.getInstrumentation().targetContext,
@@ -119,8 +131,11 @@ class VisitFlowManualTest {
             val completed = AtomicReference<UserUnlock?>(null)
             val failure = AtomicReference<Throwable?>(null)
             val finished = AtomicBoolean(false)
+            val deferred = AtomicBoolean(false)
+            val readyToRestore = AtomicBoolean(false)
+            val restoration = StateRestorationTester(compose)
 
-            compose.setContent {
+            restoration.setContent {
                 TravelockTheme {
                     val context = LocalContext.current
                     val scope = rememberCoroutineScope()
@@ -129,22 +144,31 @@ class VisitFlowManualTest {
                             Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED)
                     }
                     var busy by remember { mutableStateOf(false) }
-                    var success by remember { mutableStateOf(false) }
-                    var failed by remember { mutableStateOf(false) }
-                    var visit by remember { mutableStateOf<VisitAttempt?>(null) }
-                    var retryPath by remember { mutableStateOf<String?>(null) }
-                    var status by remember { mutableStateOf("Scan the destination QR to start your visit.") }
+                    var progress by rememberVisitProgress(user.id, initialProgress)
+                    val success = progress.completed
+                    val visit = progress.visit
+                    val retryPath = progress.uploadedPhotoPath
+                    var failed by rememberSaveable { mutableStateOf(false) }
+                    var status by rememberSaveable { mutableStateOf(
+                        if (resuming) "Saved visit loaded. Retry completion with the uploaded photo."
+                        else if (initialProgress.visit != null) "Saved visit loaded. Take a visit photo."
+                        else "Scan the destination QR to start your visit."
+                    ) }
                     suspend fun submit(capturedVisit: VisitAttempt, bytes: ByteArray? = null) {
                         try {
                             val result = if (bytes != null) {
-                                coordinator.completeCapturedVisit(capturedVisit, bytes) { retryPath = it }
+                                coordinator.completeCapturedVisit(capturedVisit, bytes) {
+                                    progress = progress.copy(uploadedPhotoPath = it)
+                                    progressStore.save(user.id, progress)
+                                }
                             } else {
                                 coordinator.completeUploadedVisit(capturedVisit, checkNotNull(retryPath))
                             }
                             when (result) {
                                 is VisitCompletionResult.Completed -> {
                                     completed.set(result.unlock)
-                                    success = true
+                                    progress = progress.copy(completed = true)
+                                    progressStore.save(user.id, progress)
                                     status = "Visit completed successfully."
                                 }
                                 VisitCompletionResult.LocationPermissionRequired -> {
@@ -166,6 +190,9 @@ class VisitFlowManualTest {
                             } else "Visit failed: ${error.message.orEmpty()}"
                         } finally {
                             busy = false
+                            if (testRestore && expectedRejection.get() && !progress.completed) {
+                                readyToRestore.set(true)
+                            }
                         }
                     }
                     val requestLocation = rememberLauncherForActivityResult(
@@ -201,7 +228,8 @@ class VisitFlowManualTest {
                                                 val started = repository.startVisit(scannedCode)
                                                 check(started.destinationId == destinationId)
                                                 startedVisit.set(started)
-                                                visit = started
+                                                progress = VisitProgress(visit = started)
+                                                progressStore.save(user.id, progress)
                                                 status = "QR accepted. Allow precise location, then take a visit photo."
                                             } catch (error: CancellationException) {
                                                 throw error
@@ -250,6 +278,12 @@ class VisitFlowManualTest {
                                 }, enabled = locationAllowed && !busy) { Text("Retry completion") }
                             }
                             Text(status)
+                            if (testReopen && !resuming && expectedRejection.get() && retryPath != null) {
+                                Button(onClick = {
+                                    deferred.set(true)
+                                    finished.set(true)
+                                }, enabled = !busy) { Text("Save and finish later") }
+                            }
                             Button(onClick = { finished.set(true) }, enabled = (success || failed) && !busy) {
                                 Text("Finish test")
                             }
@@ -258,7 +292,20 @@ class VisitFlowManualTest {
                 }
             }
 
+            if (testRestore && !resuming) {
+                compose.waitUntil(timeoutMillis = 10 * 60 * 1000L) { readyToRestore.get() }
+                restoration.emulateSavedInstanceStateRestore()
+                compose.waitForIdle()
+            }
             compose.waitUntil(timeoutMillis = 10 * 60 * 1000L) { finished.get() }
+            if (deferred.get()) {
+                val saved = progressStore.load(user.id)
+                assertEquals(startedVisit.get(), saved.visit)
+                assertEquals(uploadedPath.get(), saved.uploadedPhotoPath)
+                assertEquals(1, uploads.get())
+                assertTrue(expectedRejection.get())
+                return@runBlocking
+            }
             failure.get()?.let { throw it }
             val unlock = checkNotNull(completed.get())
             val visit = checkNotNull(startedVisit.get())
@@ -271,8 +318,9 @@ class VisitFlowManualTest {
             assertNotNull(savedVisit.completedAt)
             assertTrue(savedVisit.photoPath.orEmpty().startsWith("${user.id}/${visit.visitId}/"))
             assertEquals(uploadedPath.get(), savedVisit.photoPath)
-            assertEquals("Completion retry must reuse the first uploaded photo.", 1, uploads.get())
-            if (testRetry) assertTrue("The initial 51-metre rejection must be exercised.", expectedRejection.get())
+            assertEquals("Completion retry must reuse the first uploaded photo.", if (resuming) 0 else 1, uploads.get())
+            if (testRetry && !resuming) assertTrue("The initial 51-metre rejection must be exercised.", expectedRejection.get())
+            assertEquals(VisitProgress(), progressStore.load(user.id))
         } finally {
             supabase.auth.signOut()
         }
