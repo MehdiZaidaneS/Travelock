@@ -6,6 +6,7 @@ import com.example.travelock.data.model.VisitAttempt
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.postgrest.query.Columns
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -66,6 +67,18 @@ class UserUnlockRepository {
         return supabase.postgrest.rpc("cancel_visit", buildJsonObject {
             put("attempt_id", visitId)
         }).decodeAs<VisitAttempt>()
+    }
+
+    // Load the destination details alongside each unlock in one request.
+    suspend fun getMyUnlocksWithDestinations(): List<UserUnlock> {
+        supabase.auth.awaitInitialization()
+        val user = checkNotNull(supabase.auth.currentUserOrNull()) {
+            "You must sign in before loading your unlocks."
+        }
+        return supabase.from("user_unlocks")
+            .select(Columns.raw("*,destination:destinations(*)")) {
+                filter { eq("user_id", user.id) }
+            }.decodeList<UserUnlock>()
     }
 
     suspend fun getMyUnlocks(): List<UserUnlock> {

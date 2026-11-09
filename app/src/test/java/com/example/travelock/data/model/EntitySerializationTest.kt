@@ -13,6 +13,33 @@ class EntitySerializationTest {
     private val json = Json { ignoreUnknownKeys = true }
 
     @Test
+    fun unlockDecodesJoinedDestinationAndPreservesPlainResponses() {
+        val unlock = json.decodeFromString<UserUnlock>(
+            """
+            {
+              "unlock_id": "unlock-1", "user_id": "user-1", "destination_id": "destination-1",
+              "unlocked_at": "2026-11-10T00:15:00.123456+02:00",
+              "destination": {
+                "destination_id": "destination-1", "location_id": "location-1",
+                "name": "Oodi Library", "description": "Library visit", "discount": 0,
+                "latitude": 60.1738, "longitude": 24.9381, "image": "oodi.jpg",
+                "qr_code": "TEST-OODI-001"
+              }
+            }
+            """.trimIndent(),
+        )
+        val destination = checkNotNull(unlock.destination)
+        assertEquals(unlock.destinationId, destination.destinationId)
+        assertEquals("Oodi Library", destination.name)
+        assertEquals("Library visit", destination.description)
+        assertEquals("oodi.jpg", destination.image)
+        assertEquals(Instant.parse("2026-11-09T22:15:00.123456Z"), unlock.unlockedAt)
+        assertEquals(unlock, json.decodeFromString<UserUnlock>(json.encodeToString(unlock)))
+        val plain = unlock.copy(destination = null)
+        assertEquals(plain, json.decodeFromString<UserUnlock>(json.encodeToString(plain)))
+    }
+
+    @Test
     fun enrolmentDecodesDatabaseColumnsAndTimestamp() {
         val enrolment = json.decodeFromString<UserEnrolment>(
             """

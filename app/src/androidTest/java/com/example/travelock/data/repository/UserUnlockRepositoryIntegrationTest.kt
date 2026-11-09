@@ -82,6 +82,11 @@ class UserUnlockRepositoryIntegrationTest {
                 }
                 .decodeSingle<Destination>()
             val repository = UserUnlockRepository()
+            val detailedUnlocks = repository.getMyUnlocksWithDestinations()
+            assertEquals(ownUnlocks.toSet(), detailedUnlocks.map { it.copy(destination = null) }.toSet())
+            assertTrue(detailedUnlocks.all { it.userId == user.id })
+            assertEquals(destination, detailedUnlocks.single { it.destinationId == destinationId }.destination)
+            assertTrue(detailedUnlocks.all { it.destination?.destinationId == it.destinationId })
             // Starting creates a pending attempt, but must not award an unlock.
             val visit = repository.startVisit(destination.qrCode)
             assertEquals(user.id, visit.userId)
