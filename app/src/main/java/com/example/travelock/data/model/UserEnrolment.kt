@@ -15,4 +15,6 @@ data class UserEnrolment(
     @SerialName("enrolled_at")
     @Serializable(with = InstantSerializer::class)
     val enrolledAt: Instant,
+    // Filled when the query includes the related destination.
+    val destination: Destination? = null,
 )

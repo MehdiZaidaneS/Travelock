@@ -55,6 +55,13 @@ class UserEnrolmentRepositoryIntegrationTest {
             assertEquals(first, fetched.single { it.destinationId == destinationId })
             assertEquals(before.toSet() + first, fetched.toSet())
 
+            val detailed = repository.getMyEnrolmentsWithDestinations()
+            assertEquals(fetched.toSet(), detailed.map { it.copy(destination = null) }.toSet())
+            assertTrue(detailed.all { it.userId == user.id })
+            val fixture = checkNotNull(DestinationRepository().getDestination(destinationId))
+            assertEquals(fixture, detailed.single { it.destinationId == destinationId }.destination)
+            assertTrue(detailed.all { it.destination?.destinationId == it.destinationId })
+
             // Query without a user filter, as in the earlier SQL RLS check.
             val visible = supabase.from("user_enrolments").select {
                 filter { eq("destination_id", destinationId) }

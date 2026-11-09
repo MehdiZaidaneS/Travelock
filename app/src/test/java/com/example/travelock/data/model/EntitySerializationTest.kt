@@ -26,6 +26,31 @@ class EntitySerializationTest {
         assertEquals("user-1", enrolment.userId)
         assertEquals("destination-1", enrolment.destinationId)
         assertEquals(Instant.parse("2026-11-09T22:15:00.123456Z"), enrolment.enrolledAt)
+        assertNull(enrolment.destination)
+        assertEquals(enrolment, json.decodeFromString<UserEnrolment>(json.encodeToString(enrolment)))
+    }
+
+    @Test
+    fun enrolmentDecodesJoinedDestinationObject() {
+        val enrolment = json.decodeFromString<UserEnrolment>(
+            """
+            {
+              "enrolment_id": "enrolment-1", "user_id": "user-1",
+              "destination_id": "destination-1", "enrolled_at": "2026-11-10T00:15:00Z",
+              "destination": {
+                "destination_id": "destination-1", "location_id": "location-1",
+                "name": "Oodi Library", "description": "Library visit", "discount": 0,
+                "latitude": 60.1738, "longitude": 24.9381, "image": "oodi.jpg",
+                "qr_code": "TEST-OODI-001"
+              }
+            }
+            """.trimIndent(),
+        )
+        val destination = checkNotNull(enrolment.destination)
+        assertEquals(enrolment.destinationId, destination.destinationId)
+        assertEquals("Oodi Library", destination.name)
+        assertEquals("Library visit", destination.description)
+        assertEquals("oodi.jpg", destination.image)
         assertEquals(enrolment, json.decodeFromString<UserEnrolment>(json.encodeToString(enrolment)))
     }
 
