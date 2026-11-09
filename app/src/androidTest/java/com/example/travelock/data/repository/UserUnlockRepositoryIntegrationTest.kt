@@ -3,13 +3,17 @@ package com.example.travelock.data.repository
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.example.travelock.data.SupabaseProvider
+import com.example.travelock.data.model.Destination
 import com.example.travelock.data.model.UserUnlock
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.postgrest.exception.PostgrestRestException
+import java.util.UUID
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -63,6 +67,31 @@ class UserUnlockRepositoryIntegrationTest {
                 ownUnlocks.single { it.destinationId == destinationId },
                 visibleUnlocks.single(),
             )
+
+            // Read the fixture's code so this test needs no extra runner argument.
+            val destination = supabase.from("destinations")
+                .select {
+                    filter { eq("destination_id", destinationId) }
+                }
+                .decodeSingle<Destination>()
+            val repository = UserUnlockRepository()
+            val firstScan = repository.unlockDestination(destination.qrCode)
+            val repeatedScan = repository.unlockDestination(destination.qrCode)
+
+            // The seeded unlock must keep its ID, owner, destination and timestamp.
+            assertEquals(visibleUnlocks.single(), firstScan)
+            assertEquals(firstScan, repeatedScan)
+
+            try {
+                repository.unlockDestination("INVALID-TEST-${UUID.randomUUID()}")
+                fail("An unknown QR code must be rejected by the database.")
+            } catch (error: PostgrestRestException) {
+                assertEquals("22023", error.code)
+                assertTrue(error.message.orEmpty().contains("Invalid QR code."))
+            }
+
+            // Neither a repeated scan nor a rejected code should change the unlocks.
+            assertEquals(ownUnlocks.toSet(), repository.getMyUnlocks().toSet())
         } finally {
             supabase.auth.signOut()
         }
