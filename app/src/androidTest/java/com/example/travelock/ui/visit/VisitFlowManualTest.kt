@@ -54,7 +54,7 @@ class VisitFlowManualTest {
 
     // Opt-in only: this test signs into a temporary account, creates a real visit
     // and keeps the uploaded camera photo/completed attempt in the shared project.
-    // QR scanner hardware is not exercised: the fixture supplies the scanned value.
+    // Uses the real QR scanner and camera; emulator location can be supplied separately.
     @Test
     fun completesVisitWithLivePhotoAndDeviceLocation() = runBlocking {
         val arguments = InstrumentationRegistry.getArguments()
@@ -77,7 +77,8 @@ class VisitFlowManualTest {
             val destination = checkNotNull(DestinationRepository().getDestination(destinationId)) {
                 "The test destination no longer exists."
             }
-            val visit = UserUnlockRepository().startVisit(destination.qrCode)
+            val repository = UserUnlockRepository()
+            val startedVisit = AtomicReference<VisitAttempt?>(null)
             val coordinator = VisitCompletionCoordinator(
                 InstrumentationRegistry.getInstrumentation().targetContext,
             )
@@ -96,7 +97,8 @@ class VisitFlowManualTest {
                     var busy by remember { mutableStateOf(false) }
                     var success by remember { mutableStateOf(false) }
                     var failed by remember { mutableStateOf(false) }
-                    var status by remember { mutableStateOf("Allow precise location, then take a visit photo.") }
+                    var visit by remember { mutableStateOf<VisitAttempt?>(null) }
+                    var status by remember { mutableStateOf("Scan the destination QR to start your visit.") }
                     val requestLocation = rememberLauncherForActivityResult(
                         ActivityResultContracts.RequestMultiplePermissions(),
                     ) { permissions ->
@@ -112,9 +114,41 @@ class VisitFlowManualTest {
                         ) {
                             Text("Complete visit test", style = MaterialTheme.typography.headlineSmall)
                             Text("Destination: ${destination.name}")
-                            Text("A visit has started using its test QR value. Take a new photo. The server requires a location within 50 metres.")
+                            Text("Scan the destination QR, then take a new photo. The server requires a location within 50 metres.")
                             Text("This test uploads and keeps a private photo in Supabase.")
-                            if (!locationAllowed) {
+                            VisitQrScanButton(
+                                enabled = visit == null && !busy && !success,
+                                onQrScanned = { scannedCode ->
+                                    if (scannedCode != destination.qrCode) {
+                                        status = "Different destination scanned. Scan the test destination QR."
+                                    } else {
+                                        busy = true
+                                        failed = false
+                                        failure.set(null)
+                                        status = "Starting visit..."
+                                        scope.launch {
+                                            try {
+                                                val started = repository.startVisit(scannedCode)
+                                                check(started.destinationId == destinationId)
+                                                startedVisit.set(started)
+                                                visit = started
+                                                status = "QR accepted. Allow precise location, then take a visit photo."
+                                            } catch (error: CancellationException) {
+                                                throw error
+                                            } catch (error: Exception) {
+                                                failure.set(error)
+                                                failed = true
+                                                status = "Could not start visit: ${error.message.orEmpty()}"
+                                            } finally {
+                                                busy = false
+                                            }
+                                        }
+                                    }
+                                },
+                                onError = { status = it },
+                                onCancelled = { status = "Scanner cancelled. You can try again." },
+                            )
+                            if (visit != null && !locationAllowed) {
                                 Button(onClick = {
                                     requestLocation.launch(arrayOf(
                                         Manifest.permission.ACCESS_FINE_LOCATION,
@@ -122,8 +156,8 @@ class VisitFlowManualTest {
                                     ))
                                 }, enabled = !busy) { Text("Allow precise location") }
                             }
-                            VisitCameraButton(
-                                visit = visit,
+                            visit?.let { activeVisit -> VisitCameraButton(
+                                visit = activeVisit,
                                 enabled = locationAllowed && !busy && !success,
                                 onPhotoCaptured = { capturedVisit, bytes ->
                                     busy = true
@@ -160,7 +194,7 @@ class VisitFlowManualTest {
                                 },
                                 onError = { status = it },
                                 onCancelled = { status = "Camera cancelled. You can try again." },
-                            )
+                            ) }
                             Text(status)
                             Button(onClick = { finished.set(true) }, enabled = (success || failed) && !busy) {
                                 Text("Finish test")
@@ -173,8 +207,10 @@ class VisitFlowManualTest {
             compose.waitUntil(timeoutMillis = 10 * 60 * 1000L) { finished.get() }
             failure.get()?.let { throw it }
             val unlock = checkNotNull(completed.get())
+            val visit = checkNotNull(startedVisit.get())
             assertEquals(user.id, unlock.userId)
             assertEquals(destinationId, unlock.destinationId)
+            assertEquals(user.id, visit.userId)
             val savedVisit = supabase.from("visit_attempts").select {
                 filter { eq("visit_id", visit.visitId) }
             }.decodeSingle<VisitAttempt>()

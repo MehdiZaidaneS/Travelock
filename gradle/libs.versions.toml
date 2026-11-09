@@ -11,11 +11,13 @@ composeBom = "2026.02.01"
 supabase = "3.2.6"
 ktor = "3.3.1"
 desugarJdkLibs = "2.1.5"
+codeScanner = "16.1.0"
 
 [libraries]
 supabase-bom = { module = "io.github.jan-tennert.supabase:bom", version.ref = "supabase" }
 supabase-postgrest = { module = "io.github.jan-tennert.supabase:postgrest-kt" }
 supabase-storage = { module = "io.github.jan-tennert.supabase:storage-kt" }
+google-code-scanner = { module = "com.google.android.gms:play-services-code-scanner", version.ref = "codeScanner" }
 ktor-client-android = { module = "io.ktor:ktor-client-android", version.ref = "ktor" }
 desugar-jdk-libs = { module = "com.android.tools:desugar_jdk_libs", version.ref = "desugarJdkLibs" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
