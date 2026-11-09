@@ -24,9 +24,44 @@ class VisitCancellationCoordinatorTest {
         val coordinator = VisitCancellationCoordinator(
             { id -> assertEquals(visit.visitId, id); calls.add("server"); cancelled },
             { userId -> assertEquals(visit.userId, userId); calls.add("clear") },
+            { actual -> assertEquals(cancelled, actual); calls.add("cleanup") },
         )
         assertEquals(cancelled, coordinator.cancel(visit))
-        assertEquals(listOf("server", "clear"), calls)
+        assertEquals(listOf("server", "cleanup", "clear"), calls)
+    }
+
+    @Test
+    fun interruptedCleanupKeepsCheckpointForAnotherAttempt() = runBlocking {
+        var cleaning = false
+        val coordinator = VisitCancellationCoordinator(
+            { cancelled }, { error("Must keep checkpoint until cleanup finishes") },
+            { cleaning = true; awaitCancellation() },
+        )
+        val job = launch(start = CoroutineStart.UNDISPATCHED) { coordinator.cancel(visit) }
+        assertTrue(cleaning)
+        job.cancelAndJoin()
+        assertTrue(job.isCancelled)
+    }
+
+    @Test
+    fun cleanupFailureKeepsCheckpointAndCanBeRetried() = runBlocking {
+        var cleanups = 0
+        var cleared = false
+        val failure = IOException("Storage offline")
+        val coordinator = VisitCancellationCoordinator(
+            { cancelled }, { cleared = true },
+            { if (++cleanups == 1) throw failure },
+        )
+        try {
+            coordinator.cancel(visit)
+            throw AssertionError("Expected cleanup failure")
+        } catch (error: VisitPhotoCleanupException) {
+            assertSame(failure, error.cause)
+        }
+        assertEquals(false, cleared)
+        assertEquals(cancelled, coordinator.cancel(visit))
+        assertTrue(cleared)
+        assertEquals(2, cleanups)
     }
 
     @Test

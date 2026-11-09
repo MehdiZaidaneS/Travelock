@@ -12,9 +12,11 @@ import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.exception.PostgrestRestException
+import io.github.jan.supabase.storage.storage
 import java.util.UUID
 import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.CancellationException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -176,6 +178,35 @@ class UserUnlockRepositoryIntegrationTest {
             assertEquals(completed, repeated)
 
             // The existing fixture keeps its original unlock ID and timestamp.
+            assertEquals(ownUnlocks.toSet(), repository.getMyUnlocks().toSet())
+
+            // These temporary images exercise the actual Storage API. Only the
+            // cancelled attempt's files are removed; completed photos stay private.
+            val photos = VisitPhotoRepository()
+            val bucket = supabase.storage.from("visit-photos")
+            suspend fun assertProtected(path: String) {
+                try {
+                    bucket.delete(listOf(path))
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (_: Exception) {
+                    // Storage may reject the request or return no deleted objects.
+                }
+                assertTrue("An active/completed visit photo must remain present.",
+                    bucket.list(path.substringBeforeLast('/')).any { it.name == path.substringAfterLast('/') })
+            }
+            assertProtected(photoPath)
+            val cleanupVisit = repository.startVisit(destination.qrCode)
+            val cleanupPath = photos.uploadPhoto(cleanupVisit, photoBytes)
+            photos.uploadPhoto(cleanupVisit, photoBytes)
+            assertProtected(cleanupPath)
+            val cancelledVisit = repository.cancelVisit(cleanupVisit.visitId)
+            photos.deleteCancelledVisitPhotos(cancelledVisit)
+            photos.deleteCancelledVisitPhotos(cancelledVisit)
+            assertTrue("Cancelled visit folder must be empty after cleanup.",
+                bucket.list("${user.id}/${cleanupVisit.visitId}").isEmpty())
+            assertTrue("Cleanup must preserve the completed visit photo.",
+                bucket.list("${user.id}/${visit.visitId}").any { it.name == photoPath.substringAfterLast('/') })
             assertEquals(ownUnlocks.toSet(), repository.getMyUnlocks().toSet())
         } finally {
             supabase.auth.signOut()

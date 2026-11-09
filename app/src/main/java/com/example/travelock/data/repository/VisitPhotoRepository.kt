@@ -10,6 +10,16 @@ import java.util.UUID
 class VisitPhotoRepository {
     private val supabase = SupabaseProvider.client
 
+    suspend fun deleteCancelledVisitPhotos(visit: VisitAttempt) {
+        supabase.auth.awaitInitialization()
+        val user = checkNotNull(supabase.auth.currentUserOrNull()) { "Sign in before cleaning up visit photos." }
+        val bucket = supabase.storage.from("visit-photos")
+        CancelledVisitPhotoCleanup(
+            listNames = { prefix -> bucket.list(prefix) { limit = 100; offset = 0 }.map { it.name } },
+            deletePaths = { paths -> bucket.delete(paths) },
+        ).delete(visit, user.id)
+    }
+
     // The camera flow supplies a newly captured JPEG. This upload helper cannot
     // determine where the bytes came from; it does not open a camera or gallery.
     suspend fun uploadPhoto(visit: VisitAttempt, jpegBytes: ByteArray): String {

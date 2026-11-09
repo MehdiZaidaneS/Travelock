@@ -41,6 +41,7 @@ import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.exception.PostgrestRestException
+import io.github.jan.supabase.storage.storage
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
@@ -307,7 +308,8 @@ class VisitFlowManualTest {
                                         } catch (error: Exception) {
                                             failure.set(error)
                                             failed = true
-                                            status = "Could not cancel visit: ${error.message.orEmpty()}"
+                                            status = if (error is VisitPhotoCleanupException) error.message.orEmpty()
+                                            else "Could not cancel visit: ${error.message.orEmpty()}"
                                         } finally {
                                             busy = false
                                         }
@@ -351,6 +353,8 @@ class VisitFlowManualTest {
                 assertEquals(VisitProgress(), progressStore.load(user.id))
                 assertEquals(unlocksBefore, repository.getMyUnlocks().toSet())
                 assertEquals(cancelled, repository.cancelVisit(cancelled.visitId))
+                assertTrue("Cancellation must remove this attempt's uploaded photos.",
+                    supabase.storage.from("visit-photos").list("${user.id}/${cancelled.visitId}").isEmpty())
                 try {
                     repository.completeVisit(cancelled.visitId,
                         uploadedPath.get() ?: "${user.id}/${cancelled.visitId}/missing.jpg",
