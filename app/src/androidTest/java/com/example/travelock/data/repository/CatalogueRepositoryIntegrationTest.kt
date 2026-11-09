@@ -37,11 +37,21 @@ class CatalogueRepositoryIntegrationTest {
                 filter { eq("destination_id", destinationId) }
             }
             .decodeSingle<Destination>()
-        val locations = LocationRepository().getLocations()
+        val locationRepository = LocationRepository()
+        val locations = locationRepository.getLocations()
         assertTrue(
             "The fixture's location must be visible while signed out.",
             locations.any { it.locationId == fixture.locationId },
         )
+
+        val fixtureLocation = locations.single { it.locationId == fixture.locationId }
+        assertTrue("The search fixture needs a nonblank name.", fixtureLocation.name.isNotBlank())
+        val searchTerm = fixtureLocation.name.take(3).uppercase()
+        val searchResults = locationRepository.searchLocations("  $searchTerm  ")
+        assertTrue(searchResults.any { it.locationId == fixture.locationId })
+        assertTrue(searchResults.all { it.name.contains(searchTerm, ignoreCase = true) })
+        assertTrue(locationRepository.searchLocations(UUID.randomUUID().toString()).isEmpty())
+        assertEquals(locations.toSet(), locationRepository.searchLocations("   ").toSet())
 
         val repository = DestinationRepository()
         assertEquals(fixture, repository.getDestination(destinationId))

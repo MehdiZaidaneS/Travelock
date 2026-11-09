@@ -14,4 +14,18 @@ class LocationRepository {
             .select()
             .decodeList<Location>()
     }
+
+    suspend fun searchLocations(query: String): List<Location> {
+        val searchTerm = query.trim()
+        // Clearing the search shows the full list again.
+        if (searchTerm.isEmpty()) return getLocations()
+
+        return supabase.from("locations")
+            .select {
+                filter {
+                    ilike("name", "%$searchTerm%")
+                }
+            }
+            .decodeList<Location>()
+    }
 }
