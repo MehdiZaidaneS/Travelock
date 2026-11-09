@@ -44,6 +44,9 @@ class CatalogueRepositoryIntegrationTest {
         )
 
         val repository = DestinationRepository()
+        assertEquals(fixture, repository.getDestination(destinationId))
+        assertNull(repository.getDestination(UUID.randomUUID().toString()))
+
         val destinations = repository.getDestinationsByLocation(fixture.locationId)
         assertEquals(fixture, destinations.single { it.destinationId == destinationId })
         assertTrue(destinations.all { it.locationId == fixture.locationId })
