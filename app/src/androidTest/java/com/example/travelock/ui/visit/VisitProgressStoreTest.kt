@@ -46,6 +46,14 @@ class VisitProgressStoreTest {
     }
 
     @Test
+    fun cancelledProgressRemovesTheSavedRetry() = runBlocking {
+        val store = VisitProgressStore(context, name)
+        store.save("user-1", pending)
+        store.save("user-1", pending.copy(visit = visit.copy(cancelledAt = Instant.now())))
+        assertEquals(VisitProgress(), VisitProgressStore(context, name).load("user-1"))
+    }
+
+    @Test
     fun completionRemovesTheSavedRetry() = runBlocking {
         val store = VisitProgressStore(context, name)
         store.save("user-1", pending)

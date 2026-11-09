@@ -59,6 +59,7 @@ class VisitCompletionCoordinator internal constructor(
         preparePhoto: suspend () -> String,
     ): VisitCompletionResult {
         require(visit.completedAt == null) { "This visit has already been completed." }
+        require(visit.cancelledAt == null) { "This visit has been cancelled." }
 
         // Do not upload anything until the phone can provide a location.
         val location = when (val result = getLocation()) {

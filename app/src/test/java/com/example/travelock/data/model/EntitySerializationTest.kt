@@ -26,6 +26,9 @@ class EntitySerializationTest {
         assertEquals(Instant.parse("2026-11-09T15:00:00.123456Z"), pending.startedAt)
         assertNull(pending.completedAt)
         assertNull(pending.photoPath)
+        assertNull(pending.cancelledAt)
+        val cancelled = pending.copy(cancelledAt = Instant.parse("2026-11-10T12:00:00Z"))
+        assertEquals(cancelled, json.decodeFromString<VisitAttempt>(json.encodeToString(cancelled)))
 
         val completed = json.decodeFromString<VisitAttempt>(
             """

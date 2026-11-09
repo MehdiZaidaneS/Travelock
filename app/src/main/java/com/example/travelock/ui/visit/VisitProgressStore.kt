@@ -14,14 +14,14 @@ class VisitProgressStore(context: Context, name: String = "visit_progress") {
         require(userId.isNotBlank())
         val saved = preferences.getString(userId, null) ?: return@withContext VisitProgress()
         runCatching { Json.decodeFromString<VisitProgress>(saved) }.getOrNull()
-            ?.takeIf { validFor(userId, it) && !it.completed }
+            ?.takeIf { validFor(userId, it) && !it.completed && it.visit?.cancelledAt == null }
             ?: VisitProgress()
     }
 
     suspend fun save(userId: String, progress: VisitProgress) = withContext(Dispatchers.IO) {
         require(userId.isNotBlank() && validFor(userId, progress)) { "Invalid visit checkpoint." }
         val editor = preferences.edit()
-        if (progress.completed || progress.visit == null) editor.remove(userId)
+        if (progress.completed || progress.visit == null || progress.visit.cancelledAt != null) editor.remove(userId)
         else editor.putString(userId, Json.encodeToString(progress))
         check(editor.commit()) { "Could not save visit progress. Please try again." }
     }

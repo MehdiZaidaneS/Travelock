@@ -64,7 +64,7 @@ fun VisitCameraButton(
         } else if (!saved) {
             files.delete(file)
             currentOnCancelled()
-        } else if (requestedVisitId != currentVisit.visitId || currentVisit.completedAt != null) {
+        } else if (requestedVisitId != currentVisit.visitId || currentVisit.completedAt != null || currentVisit.cancelledAt != null) {
             files.delete(file)
             currentOnError(visitChangedMessage)
         } else {
@@ -81,7 +81,7 @@ fun VisitCameraButton(
                     preparingPhoto = false
                 }
                 if (bytes != null) {
-                    if (currentVisit.visitId == capturedVisit.visitId && currentVisit.completedAt == null) {
+                    if (currentVisit.visitId == capturedVisit.visitId && currentVisit.completedAt == null && currentVisit.cancelledAt == null) {
                         currentOnPhoto(capturedVisit, bytes)
                     } else {
                         currentOnError(visitChangedMessage)
@@ -117,7 +117,7 @@ fun VisitCameraButton(
             }
         },
         modifier = modifier,
-        enabled = enabled && visit.completedAt == null && pendingFile == null && !preparingPhoto,
+        enabled = enabled && visit.completedAt == null && visit.cancelledAt == null && pendingFile == null && !preparingPhoto,
     ) {
         Text(stringResource(if (preparingPhoto) R.string.visit_photo_preparing else R.string.visit_photo_take))
     }

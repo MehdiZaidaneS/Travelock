@@ -89,12 +89,16 @@ class VisitFlowManualTest {
                 "The test destination no longer exists."
             }
             val repository = UserUnlockRepository()
+            val unlocksBefore = repository.getMyUnlocks().toSet()
+            val cancellation = VisitCancellationCoordinator(InstrumentationRegistry.getInstrumentation().targetContext)
+            val cancelledAttempt = AtomicReference<VisitAttempt?>(null)
             val progressStore = VisitProgressStore(InstrumentationRegistry.getInstrumentation().targetContext)
             val initialProgress = progressStore.load(user.id)
             require(initialProgress.visit == null || initialProgress.visit.destinationId == destinationId) {
                 "A saved visit belongs to a different destination. Use its test destination first."
             }
             val resuming = initialProgress.uploadedPhotoPath != null
+            val resumedVisit = AtomicBoolean(resuming)
             val startedVisit = AtomicReference(initialProgress.visit)
             val uploads = AtomicInteger()
             val uploadedPath = AtomicReference(initialProgress.uploadedPhotoPath)
@@ -149,6 +153,7 @@ class VisitFlowManualTest {
                     val visit = progress.visit
                     val retryPath = progress.uploadedPhotoPath
                     var failed by rememberSaveable { mutableStateOf(false) }
+                    var cancelled by rememberSaveable { mutableStateOf(false) }
                     var status by rememberSaveable { mutableStateOf(
                         if (resuming) "Saved visit loaded. Retry completion with the uploaded photo."
                         else if (initialProgress.visit != null) "Saved visit loaded. Take a visit photo."
@@ -228,7 +233,14 @@ class VisitFlowManualTest {
                                                 val started = repository.startVisit(scannedCode)
                                                 check(started.destinationId == destinationId)
                                                 startedVisit.set(started)
+                                                uploads.set(0)
+                                                uploadedPath.set(null)
+                                                cancelledAttempt.set(null)
+                                                expectedRejection.set(false)
+                                                firstCompletion = true
+                                                resumedVisit.set(false)
                                                 progress = VisitProgress(visit = started)
+                                                cancelled = false
                                                 progressStore.save(user.id, progress)
                                                 status = "QR accepted. Allow precise location, then take a visit photo."
                                             } catch (error: CancellationException) {
@@ -278,13 +290,37 @@ class VisitFlowManualTest {
                                 }, enabled = locationAllowed && !busy) { Text("Retry completion") }
                             }
                             Text(status)
+                            if (visit != null && !success) {
+                                Button(onClick = {
+                                    val activeVisit = checkNotNull(visit)
+                                    busy = true
+                                    scope.launch {
+                                        try {
+                                            cancelledAttempt.set(cancellation.cancel(activeVisit))
+                                            progress = VisitProgress()
+                                            cancelled = true
+                                            failed = false
+                                            failure.set(null)
+                                            status = "Visit cancelled. You can scan again or finish this test."
+                                        } catch (error: CancellationException) {
+                                            throw error
+                                        } catch (error: Exception) {
+                                            failure.set(error)
+                                            failed = true
+                                            status = "Could not cancel visit: ${error.message.orEmpty()}"
+                                        } finally {
+                                            busy = false
+                                        }
+                                    }
+                                }, enabled = !busy) { Text("Cancel visit") }
+                            }
                             if (testReopen && !resuming && expectedRejection.get() && retryPath != null) {
                                 Button(onClick = {
                                     deferred.set(true)
                                     finished.set(true)
                                 }, enabled = !busy) { Text("Save and finish later") }
                             }
-                            Button(onClick = { finished.set(true) }, enabled = (success || failed) && !busy) {
+                            Button(onClick = { finished.set(true) }, enabled = (success || failed || cancelled) && !busy) {
                                 Text("Finish test")
                             }
                         }
@@ -293,9 +329,11 @@ class VisitFlowManualTest {
             }
 
             if (testRestore && !resuming) {
-                compose.waitUntil(timeoutMillis = 10 * 60 * 1000L) { readyToRestore.get() }
-                restoration.emulateSavedInstanceStateRestore()
-                compose.waitForIdle()
+                compose.waitUntil(timeoutMillis = 10 * 60 * 1000L) { readyToRestore.get() || finished.get() }
+                if (!finished.get()) {
+                    restoration.emulateSavedInstanceStateRestore()
+                    compose.waitForIdle()
+                }
             }
             compose.waitUntil(timeoutMillis = 10 * 60 * 1000L) { finished.get() }
             if (deferred.get()) {
@@ -307,6 +345,23 @@ class VisitFlowManualTest {
                 return@runBlocking
             }
             failure.get()?.let { throw it }
+            if (cancelledAttempt.get() != null && completed.get() == null) {
+                val cancelled = checkNotNull(cancelledAttempt.get())
+                assertNotNull(cancelled.cancelledAt)
+                assertEquals(VisitProgress(), progressStore.load(user.id))
+                assertEquals(unlocksBefore, repository.getMyUnlocks().toSet())
+                assertEquals(cancelled, repository.cancelVisit(cancelled.visitId))
+                try {
+                    repository.completeVisit(cancelled.visitId,
+                        uploadedPath.get() ?: "${user.id}/${cancelled.visitId}/missing.jpg",
+                        destination.latitude, destination.longitude)
+                    error("A cancelled attempt must not complete.")
+                } catch (error: PostgrestRestException) {
+                    assertEquals("22023", error.code)
+                    assertTrue(error.message.orEmpty().contains("cancelled"))
+                }
+                return@runBlocking
+            }
             val unlock = checkNotNull(completed.get())
             val visit = checkNotNull(startedVisit.get())
             assertEquals(user.id, unlock.userId)
@@ -318,8 +373,8 @@ class VisitFlowManualTest {
             assertNotNull(savedVisit.completedAt)
             assertTrue(savedVisit.photoPath.orEmpty().startsWith("${user.id}/${visit.visitId}/"))
             assertEquals(uploadedPath.get(), savedVisit.photoPath)
-            assertEquals("Completion retry must reuse the first uploaded photo.", if (resuming) 0 else 1, uploads.get())
-            if (testRetry && !resuming) assertTrue("The initial 51-metre rejection must be exercised.", expectedRejection.get())
+            assertEquals("Completion retry must reuse the first uploaded photo.", if (resumedVisit.get()) 0 else 1, uploads.get())
+            if (testRetry && !resumedVisit.get()) assertTrue("The initial 51-metre rejection must be exercised.", expectedRejection.get())
             assertEquals(VisitProgress(), progressStore.load(user.id))
         } finally {
             supabase.auth.signOut()

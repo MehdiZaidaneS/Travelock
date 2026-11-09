@@ -16,6 +16,7 @@ class VisitPhotoRepository {
         require(jpegBytes.isNotEmpty()) { "The visit photo cannot be empty." }
         require(jpegBytes.size <= 10 * 1024 * 1024) { "The visit photo must be at most 10 MiB." }
         require(visit.completedAt == null) { "This visit has already been completed." }
+        require(visit.cancelledAt == null) { "This visit has been cancelled." }
         require(UUID.fromString(visit.visitId).toString() == visit.visitId) { "Invalid visit ID." }
 
         supabase.auth.awaitInitialization()

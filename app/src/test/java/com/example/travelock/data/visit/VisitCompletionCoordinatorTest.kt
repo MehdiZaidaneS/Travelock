@@ -121,6 +121,9 @@ class VisitCompletionCoordinatorTest {
         assertThrows(IllegalArgumentException::class.java) {
             runBlocking { coordinator.completeUploadedVisit(visit.copy(completedAt = Instant.now()), photoPath) }
         }
+        assertThrows(IllegalArgumentException::class.java) {
+            runBlocking { coordinator.completeUploadedVisit(visit.copy(cancelledAt = Instant.now()), photoPath) }
+        }
     }
 
     @Test

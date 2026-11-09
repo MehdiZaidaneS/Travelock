@@ -59,6 +59,15 @@ class UserUnlockRepository {
             .decodeAs<UserUnlock>()
     }
 
+    suspend fun cancelVisit(visitId: String): VisitAttempt {
+        require(visitId.isNotBlank()) { "Visit ID cannot be blank." }
+        supabase.auth.awaitInitialization()
+        checkNotNull(supabase.auth.currentUserOrNull()) { "You must sign in before cancelling a visit." }
+        return supabase.postgrest.rpc("cancel_visit", buildJsonObject {
+            put("attempt_id", visitId)
+        }).decodeAs<VisitAttempt>()
+    }
+
     suspend fun getMyUnlocks(): List<UserUnlock> {
         supabase.auth.awaitInitialization()
 

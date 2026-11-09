@@ -88,6 +88,14 @@ class VisitCameraButtonTest {
     }
 
     @Test
+    fun cancelledVisitCannotLaunchCamera() {
+        val camera = CameraRegistry()
+        show(camera, currentVisit = visit.copy(cancelledAt = Instant.now()))
+        compose.onNodeWithText("Take visit photo").assertIsNotEnabled()
+        assertEquals(0, camera.launches)
+    }
+
+    @Test
     fun completedVisitCannotLaunchCamera() {
         val camera = CameraRegistry()
         show(camera, currentVisit = visit.copy(completedAt = Instant.now(), photoPath = "saved.jpg"))

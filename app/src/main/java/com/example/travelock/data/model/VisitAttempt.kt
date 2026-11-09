@@ -20,4 +20,7 @@ data class VisitAttempt(
     val completedAt: Instant? = null,
     @SerialName("photo_path")
     val photoPath: String? = null,
+    @SerialName("cancelled_at")
+    @Serializable(with = InstantSerializer::class)
+    val cancelledAt: Instant? = null,
 )
