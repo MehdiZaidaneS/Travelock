@@ -13,6 +13,26 @@ class EntitySerializationTest {
     private val json = Json { ignoreUnknownKeys = true }
 
     @Test
+    fun postDecodesDatabaseRowWithoutSocialRelations() {
+        val post = json.decodeFromString<Post>(
+            """
+            {
+              "post_id": "post-1", "user_id": "user-1", "destination_id": "destination-1",
+              "image": "user-1/post-1/photo.jpg", "image_description": "A library visit",
+              "created_at": "2026-11-10T00:45:00.123456+02:00"
+            }
+            """.trimIndent(),
+        )
+        assertEquals("post-1", post.postId)
+        assertEquals("user-1/post-1/photo.jpg", post.image)
+        assertEquals("A library visit", post.imageDescription)
+        assertEquals(Instant.parse("2026-11-09T22:45:00.123456Z"), post.createdAt)
+        assertEquals(emptyList<User>(), post.likes)
+        assertEquals(emptyList<Comment>(), post.comments)
+        assertEquals(post, json.decodeFromString<Post>(json.encodeToString(post)))
+    }
+
+    @Test
     fun unlockDecodesJoinedDestinationAndPreservesPlainResponses() {
         val unlock = json.decodeFromString<UserUnlock>(
             """
