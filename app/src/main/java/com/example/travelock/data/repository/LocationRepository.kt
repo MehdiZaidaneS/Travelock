@@ -7,6 +7,19 @@ import io.github.jan.supabase.postgrest.from
 class LocationRepository {
     private val supabase = SupabaseProvider.client
 
+    // Return null if a previously listed location no longer exists.
+    suspend fun getLocation(locationId: String): Location? {
+        require(locationId.isNotBlank()) { "Location ID cannot be blank." }
+
+        return supabase.from("locations")
+            .select {
+                filter {
+                    eq("location_id", locationId)
+                }
+            }
+            .decodeSingleOrNull<Location>()
+    }
+
     // Locations are public, so browsing does not require a signed-in account.
     // Destinations are loaded separately when the user selects a location.
     suspend fun getLocations(): List<Location> {

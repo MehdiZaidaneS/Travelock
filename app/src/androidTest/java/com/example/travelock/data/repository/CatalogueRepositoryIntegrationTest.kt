@@ -45,6 +45,9 @@ class CatalogueRepositoryIntegrationTest {
         )
 
         val fixtureLocation = locations.single { it.locationId == fixture.locationId }
+        assertEquals(fixtureLocation, locationRepository.getLocation(fixture.locationId))
+        assertNull(locationRepository.getLocation(UUID.randomUUID().toString()))
+
         assertTrue("The search fixture needs a nonblank name.", fixtureLocation.name.isNotBlank())
         val searchTerm = fixtureLocation.name.take(3).uppercase()
         val searchResults = locationRepository.searchLocations("  $searchTerm  ")
