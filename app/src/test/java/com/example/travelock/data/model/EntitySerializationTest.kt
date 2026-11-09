@@ -56,7 +56,7 @@ class EntitySerializationTest {
               "created_at": "2026-11-05T12:00:00.123456+02:00",
               "unlocked_destinations": [{
                 "unlock_id": "unlock-1", "user_id": "user-1",
-                "destination_id": "destination-1", "location": "location-1",
+                "destination_id": "destination-1",
                 "unlocked_at": "2026-11-05T10:01:00Z"
               }],
               "posts": [{

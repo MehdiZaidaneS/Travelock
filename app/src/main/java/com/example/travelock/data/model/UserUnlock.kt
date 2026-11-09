@@ -15,6 +15,4 @@ data class UserUnlock(
     @SerialName("unlocked_at")
     @Serializable(with = InstantSerializer::class)
     val unlockedAt: Instant,
-
-    val location: String, // String?
 )
