@@ -26,17 +26,21 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.test.platform.app.InstrumentationRegistry
 import com.example.travelock.data.SupabaseProvider
+import com.example.travelock.data.location.DeviceLocationProvider
 import com.example.travelock.data.model.UserUnlock
 import com.example.travelock.data.model.VisitAttempt
 import com.example.travelock.data.repository.DestinationRepository
 import com.example.travelock.data.repository.UserUnlockRepository
+import com.example.travelock.data.repository.VisitPhotoRepository
 import com.example.travelock.data.visit.VisitCompletionCoordinator
 import com.example.travelock.data.visit.VisitCompletionResult
 import com.example.travelock.ui.theme.TravelockTheme
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.postgrest.exception.PostgrestRestException
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -60,6 +64,7 @@ class VisitFlowManualTest {
         val arguments = InstrumentationRegistry.getArguments()
         assumeTrue("Set manualVisitTest=true to run this interactive test.",
             arguments.getString("manualVisitTest") == "true")
+        val testRetry = arguments.getString("manualVisitRetryTest") == "true"
         val email = requireNotNull(arguments.getString("supabaseTestEmail")) {
             "Add the local supabaseTestEmail instrumentation argument."
         }
@@ -79,8 +84,37 @@ class VisitFlowManualTest {
             }
             val repository = UserUnlockRepository()
             val startedVisit = AtomicReference<VisitAttempt?>(null)
+            val uploads = AtomicInteger()
+            val uploadedPath = AtomicReference<String?>(null)
+            val expectedRejection = AtomicBoolean(false)
+            var firstCompletion = true
             val coordinator = VisitCompletionCoordinator(
-                InstrumentationRegistry.getInstrumentation().targetContext,
+                getLocation = DeviceLocationProvider(
+                    InstrumentationRegistry.getInstrumentation().targetContext,
+                )::getCurrentLocation,
+                uploadPhoto = { visit, bytes ->
+                    VisitPhotoRepository().uploadPhoto(visit, bytes).also {
+                        uploads.incrementAndGet()
+                        uploadedPath.set(it)
+                    }
+                },
+                finishVisit = { id, path, latitude, longitude ->
+                    if (testRetry && firstCompletion) {
+                        firstCompletion = false
+                        val offset = Math.toDegrees(51.0 / 6_371_008.8)
+                        val outsideLatitude = destination.latitude +
+                            if (destination.latitude >= 0) -offset else offset
+                        try {
+                            repository.completeVisit(id, path, outsideLatitude, destination.longitude)
+                            error("The server accepted completion outside 50 metres.")
+                        } catch (error: PostgrestRestException) {
+                            if (error.code == "22023" && error.message.orEmpty().contains("within 50 metres")) {
+                                expectedRejection.set(true)
+                            }
+                            throw error
+                        }
+                    } else repository.completeVisit(id, path, latitude, longitude)
+                },
             )
             val completed = AtomicReference<UserUnlock?>(null)
             val failure = AtomicReference<Throwable?>(null)
@@ -98,7 +132,42 @@ class VisitFlowManualTest {
                     var success by remember { mutableStateOf(false) }
                     var failed by remember { mutableStateOf(false) }
                     var visit by remember { mutableStateOf<VisitAttempt?>(null) }
+                    var retryPath by remember { mutableStateOf<String?>(null) }
                     var status by remember { mutableStateOf("Scan the destination QR to start your visit.") }
+                    suspend fun submit(capturedVisit: VisitAttempt, bytes: ByteArray? = null) {
+                        try {
+                            val result = if (bytes != null) {
+                                coordinator.completeCapturedVisit(capturedVisit, bytes) { retryPath = it }
+                            } else {
+                                coordinator.completeUploadedVisit(capturedVisit, checkNotNull(retryPath))
+                            }
+                            when (result) {
+                                is VisitCompletionResult.Completed -> {
+                                    completed.set(result.unlock)
+                                    success = true
+                                    status = "Visit completed successfully."
+                                }
+                                VisitCompletionResult.LocationPermissionRequired -> {
+                                    locationAllowed = false
+                                    status = "Allow precise location, then try again."
+                                }
+                                VisitCompletionResult.LocationServicesDisabled ->
+                                    status = "Turn on device location services, then try again."
+                                VisitCompletionResult.LocationUnavailable ->
+                                    status = "Location unavailable. Check the emulator location, then try again."
+                            }
+                        } catch (error: CancellationException) {
+                            throw error
+                        } catch (error: Exception) {
+                            failure.set(error)
+                            failed = true
+                            status = if (testRetry && expectedRejection.get()) {
+                                "Expected 51-metre rejection. Tap Retry completion to use the current device location."
+                            } else "Visit failed: ${error.message.orEmpty()}"
+                        } finally {
+                            busy = false
+                        }
+                    }
                     val requestLocation = rememberLauncherForActivityResult(
                         ActivityResultContracts.RequestMultiplePermissions(),
                     ) { permissions ->
@@ -116,6 +185,7 @@ class VisitFlowManualTest {
                             Text("Destination: ${destination.name}")
                             Text("Scan the destination QR, then take a new photo. The server requires a location within 50 metres.")
                             Text("This test uploads and keeps a private photo in Supabase.")
+                            if (testRetry) Text("Retry test: the first completion uses a test coordinate 51 metres away. The retry uses your current device location.")
                             VisitQrScanButton(
                                 enabled = visit == null && !busy && !success,
                                 onQrScanned = { scannedCode ->
@@ -158,43 +228,27 @@ class VisitFlowManualTest {
                             }
                             visit?.let { activeVisit -> VisitCameraButton(
                                 visit = activeVisit,
-                                enabled = locationAllowed && !busy && !success,
+                                enabled = locationAllowed && !busy && !success && retryPath == null,
                                 onPhotoCaptured = { capturedVisit, bytes ->
                                     busy = true
                                     failed = false
                                     failure.set(null)
                                     status = "Checking location and saving visit..."
-                                    scope.launch {
-                                        try {
-                                            when (val result = coordinator.completeCapturedVisit(capturedVisit, bytes)) {
-                                                is VisitCompletionResult.Completed -> {
-                                                    completed.set(result.unlock)
-                                                    success = true
-                                                    status = "Visit completed successfully."
-                                                }
-                                                VisitCompletionResult.LocationPermissionRequired -> {
-                                                    locationAllowed = false
-                                                    status = "Allow precise location, then take a new photo."
-                                                }
-                                                VisitCompletionResult.LocationServicesDisabled ->
-                                                    status = "Turn on device location services, then take a new photo."
-                                                VisitCompletionResult.LocationUnavailable ->
-                                                    status = "Location unavailable. Check the emulator location, then take a new photo."
-                                            }
-                                        } catch (error: CancellationException) {
-                                            throw error
-                                        } catch (error: Exception) {
-                                            failure.set(error)
-                                            failed = true
-                                            status = "Visit failed: ${error.message.orEmpty()}"
-                                        } finally {
-                                            busy = false
-                                        }
-                                    }
+                                    scope.launch { submit(capturedVisit, bytes) }
                                 },
                                 onError = { status = it },
                                 onCancelled = { status = "Camera cancelled. You can try again." },
                             ) }
+                            if (retryPath != null && !success) {
+                                Button(onClick = {
+                                    val activeVisit = checkNotNull(visit)
+                                    busy = true
+                                    failed = false
+                                    failure.set(null)
+                                    status = "Retrying completion with the uploaded photo..."
+                                    scope.launch { submit(activeVisit) }
+                                }, enabled = locationAllowed && !busy) { Text("Retry completion") }
+                            }
                             Text(status)
                             Button(onClick = { finished.set(true) }, enabled = (success || failed) && !busy) {
                                 Text("Finish test")
@@ -216,6 +270,9 @@ class VisitFlowManualTest {
             }.decodeSingle<VisitAttempt>()
             assertNotNull(savedVisit.completedAt)
             assertTrue(savedVisit.photoPath.orEmpty().startsWith("${user.id}/${visit.visitId}/"))
+            assertEquals(uploadedPath.get(), savedVisit.photoPath)
+            assertEquals("Completion retry must reuse the first uploaded photo.", 1, uploads.get())
+            if (testRetry) assertTrue("The initial 51-metre rejection must be exercised.", expectedRejection.get())
         } finally {
             supabase.auth.signOut()
         }

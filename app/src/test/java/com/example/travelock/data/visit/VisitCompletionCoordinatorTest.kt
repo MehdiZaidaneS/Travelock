@@ -24,6 +24,120 @@ class VisitCompletionCoordinatorTest {
     private val unlock = UserUnlock("unlock-1", "user-1", "destination-1", Instant.EPOCH)
 
     @Test
+    fun cancellationAfterUploadKeepsThePathWithoutReportingSuccess() = runBlocking {
+        var retainedPath: String? = null
+        var finishing = false
+        val coordinator = VisitCompletionCoordinator(
+            getLocation = { location },
+            uploadPhoto = { _, _ -> photoPath },
+            finishVisit = { _, _, _, _ -> finishing = true; awaitCancellation() },
+        )
+        val job = launch(start = CoroutineStart.UNDISPATCHED) {
+            coordinator.completeCapturedVisit(visit, jpeg) { retainedPath = it }
+            error("Cancelled completion must not return success")
+        }
+        assertTrue(finishing)
+        job.cancelAndJoin()
+        assertTrue(job.isCancelled)
+        assertEquals(photoPath, retainedPath)
+    }
+
+    @Test
+    fun retryStillPropagatesServerRejection() {
+        val rejection = IllegalStateException("Outside 50 metres")
+        val coordinator = VisitCompletionCoordinator(
+            getLocation = { location },
+            uploadPhoto = { _, _ -> error("Retry must not upload") },
+            finishVisit = { _, _, _, _ -> throw rejection },
+        )
+        val thrown = assertThrows(IllegalStateException::class.java) {
+            runBlocking { coordinator.completeUploadedVisit(visit, photoPath) }
+        }
+        assertSame(rejection, thrown)
+    }
+
+    @Test
+    fun completionFailureKeepsPhotoPathAndRetryUsesFreshLocationWithoutUploadingAgain() = runBlocking {
+        var uploads = 0
+        var finishes = 0
+        var fixes = 0
+        var retainedPath: String? = null
+        val failure = IOException("Completion response lost")
+        val coordinator = VisitCompletionCoordinator(
+            getLocation = { fixes++; location.copy(latitude = location.latitude + fixes * 0.00001) },
+            uploadPhoto = { _, _ -> uploads++; photoPath },
+            finishVisit = { id, path, latitude, _ ->
+                assertEquals(visit.visitId, id)
+                assertEquals(photoPath, path)
+                assertEquals(photoPath, retainedPath)
+                assertEquals(location.latitude + fixes * 0.00001, latitude, 0.0)
+                if (++finishes == 1) throw failure
+                unlock
+            },
+        )
+
+        try {
+            coordinator.completeCapturedVisit(visit, jpeg) { retainedPath = it }
+            throw AssertionError("Expected completion failure")
+        } catch (error: IOException) {
+            assertSame(failure, error)
+        }
+        assertEquals(VisitCompletionResult.Completed(unlock),
+            coordinator.completeUploadedVisit(visit, checkNotNull(retainedPath)))
+        assertEquals(1, uploads)
+        assertEquals(2, fixes)
+        assertEquals(2, finishes)
+    }
+
+    @Test
+    fun uploadedPhotoRetryRespectsLocationFailuresWithoutFinishing() = runBlocking {
+        val cases = listOf(
+            DeviceLocationResult.PermissionRequired to VisitCompletionResult.LocationPermissionRequired,
+            DeviceLocationResult.ServicesDisabled to VisitCompletionResult.LocationServicesDisabled,
+            DeviceLocationResult.Unavailable to VisitCompletionResult.LocationUnavailable,
+        )
+        for ((fix, expected) in cases) {
+            val coordinator = VisitCompletionCoordinator(
+                getLocation = { fix },
+                uploadPhoto = { _, _ -> error("Retry must not upload again") },
+                finishVisit = { _, _, _, _ -> error("Retry needs a fresh location") },
+            )
+            assertEquals(expected, coordinator.completeUploadedVisit(visit, photoPath))
+        }
+    }
+
+    @Test
+    fun retryRejectsAnotherVisitsPhotoBeforeAnyWork() {
+        val coordinator = VisitCompletionCoordinator(
+            getLocation = { error("Invalid retry must not request location") },
+            uploadPhoto = { _, _ -> error("Must not upload") },
+            finishVisit = { _, _, _, _ -> error("Must not complete") },
+        )
+        for (path in listOf("", "https://example.com/photo.jpg", "user-2/visit-1/photo.jpg", "user-1/visit-2/photo.jpg", "user-1/visit-1/")) {
+            assertThrows(IllegalArgumentException::class.java) {
+                runBlocking { coordinator.completeUploadedVisit(visit, path) }
+            }
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            runBlocking { coordinator.completeUploadedVisit(visit.copy(completedAt = Instant.now()), photoPath) }
+        }
+    }
+
+    @Test
+    fun failedUploadDoesNotPublishARetryPath() {
+        var published = false
+        val coordinator = VisitCompletionCoordinator(
+            getLocation = { location },
+            uploadPhoto = { _, _ -> throw IOException("Upload failed") },
+            finishVisit = { _, _, _, _ -> error("Must not complete") },
+        )
+        assertThrows(IOException::class.java) {
+            runBlocking { coordinator.completeCapturedVisit(visit, jpeg) { published = true } }
+        }
+        assertEquals(false, published)
+    }
+
+    @Test
     fun sendsCameraBytesAndPhoneCoordinatesInTheCorrectOrder() = runBlocking {
         val calls = mutableListOf<String>()
         val coordinator = VisitCompletionCoordinator(
