@@ -13,6 +13,17 @@ class EntitySerializationTest {
     private val json = Json { ignoreUnknownKeys = true }
 
     @Test
+    fun interactionSummaryDecodesBigintCountsAndCurrentActorState() {
+        val summary = json.decodeFromString<PostInteractionSummary>(
+            """{"like_count":123456789012,"comment_count":42,"is_liked_by_me":true}""",
+        )
+        assertEquals(123456789012L, summary.likeCount)
+        assertEquals(42L, summary.commentCount)
+        assertEquals(true, summary.isLikedByMe)
+        assertEquals(summary, json.decodeFromString<PostInteractionSummary>(json.encodeToString(summary)))
+    }
+
+    @Test
     fun postDecodesVisibilityAndVisitWhileSupportingLegacyRows() {
         val legacy = """{"post_id":"p","user_id":"u","destination_id":"d","image":"u/p/photo.jpg","image_description":"Visit","created_at":"2026-11-10T00:00:00Z"}"""
         val oldPost = json.decodeFromString<Post>(legacy)
