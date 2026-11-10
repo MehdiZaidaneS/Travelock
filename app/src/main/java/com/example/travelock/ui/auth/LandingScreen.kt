@@ -1,36 +1,48 @@
 package com.example.travelock.ui.auth
 
-import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.travelock.data.model.ThemeMode
+import com.example.travelock.ui.components.ThemeSwitcher
+import com.example.travelock.ui.theme.LocalOnThemeModeChange
+import com.example.travelock.ui.theme.LocalThemeMode
+import com.example.travelock.ui.theme.TravelockTheme
 
 @Composable
 fun LandingScreen(
     onNavigateToLogin: () -> Unit = {},
     onNavigateToRegister: () -> Unit = {}
 ) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black)
+    val themeMode = LocalThemeMode.current
+    val onThemeModeChange = LocalOnThemeModeChange.current
+
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Spacer(modifier = Modifier.height(40.dp))
+            // Theme Switcher at top for immediate testing of System / Light / Dark modes
+            ThemeSwitcher(
+                currentMode = themeMode,
+                onModeSelected = onThemeModeChange
+            )
 
             // App Branding & Introduction
             Column(
@@ -38,18 +50,17 @@ fun LandingScreen(
             ) {
                 Text(
                     text = "Travelock",
-                    fontSize = 36.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    style = MaterialTheme.typography.displayLarge,
+                    color = MaterialTheme.colorScheme.primary
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
                     text = "Discover Helsinki through gamified exploration. Unlock locations, earn achievements, and share your journey with friends!",
-                    fontSize = 16.sp,
+                    style = MaterialTheme.typography.bodyLarge,
                     textAlign = TextAlign.Center,
-                    color = Color.LightGray
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -63,9 +74,10 @@ fun LandingScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(50.dp),
+                    shape = MaterialTheme.shapes.medium,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF2196F3), // Vivid Blue
-                        contentColor = Color.White
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
                     )
                 ) {
                     Text(text = "Log In", fontSize = 16.sp, fontWeight = FontWeight.Bold)
@@ -78,15 +90,16 @@ fun LandingScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(50.dp),
+                    shape = MaterialTheme.shapes.medium,
                     colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = Color(0xFF2196F3)
+                        contentColor = MaterialTheme.colorScheme.primary
                     ),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF2196F3))
+                    border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary)
                 ) {
                     Text(text = "Register", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(16.dp))
             }
         }
     }
@@ -95,5 +108,15 @@ fun LandingScreen(
 @Preview(showBackground = true)
 @Composable
 fun LandingScreenPreview() {
-    LandingScreen()
+    TravelockTheme(themeMode = ThemeMode.LIGHT) {
+        LandingScreen()
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun LandingScreenDarkPreview() {
+    TravelockTheme(themeMode = ThemeMode.DARK) {
+        LandingScreen()
+    }
 }

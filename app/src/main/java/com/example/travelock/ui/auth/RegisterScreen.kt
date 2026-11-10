@@ -1,109 +1,163 @@
 package com.example.travelock.ui.auth
 
-import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.travelock.data.model.ThemeMode
+import com.example.travelock.ui.theme.TravelockTheme
 
+/**
+ * T-05: Registration Page supporting Account Registration (PBI-01) and Google Auth (PBI-02).
+ * Retains backward-compatible `onRegisterClick: (email, pass) -> Unit` default while also offering
+ * `onRegisterFullClick: (email, pass, username, name) -> Unit`.
+ */
 @Composable
 fun RegisterScreen(
     onRegisterClick: (email: String, pass: String) -> Unit = { _, _ -> },
-    onNavigateBack: () -> Unit = {}
+    onRegisterFullClick: ((email: String, pass: String, confirmPass: String, username: String, name: String) -> Unit)? = null,
+    onGoogleSignInClick: () -> Unit = {},
+    onNavigateToLogin: () -> Unit = {},
+    onNavigateBack: () -> Unit = {},
+    errorMessage: String? = null
 ) {
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var confirmPassword by remember { mutableStateOf("") }
+    var username by remember { mutableStateOf("mehdi_z") }
+    var fullName by remember { mutableStateOf("Mehdi Zaidane") }
+    var email by remember { mutableStateOf("mehdi@travelock.fi") }
+    var password by remember { mutableStateOf("password123") }
+    var confirmPassword by remember { mutableStateOf("password123") }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black)
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .verticalScroll(rememberScrollState())
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
             Text(
                 text = "Create Account",
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
+                style = MaterialTheme.typography.headlineLarge,
+                color = MaterialTheme.colorScheme.onBackground
             )
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
-            OutlinedTextField(
-                value = email,
-                onValueChange = { email = it },
-                label = { Text("Email", color = Color.LightGray) },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
-                    focusedBorderColor = Color(0xFF2196F3),
-                    unfocusedBorderColor = Color.Gray,
-                    focusedLabelColor = Color(0xFF2196F3)
-                )
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            OutlinedTextField(
-                value = password,
-                onValueChange = { password = it },
-                label = { Text("Password", color = Color.LightGray) },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                visualTransformation = PasswordVisualTransformation(),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
-                    focusedBorderColor = Color(0xFF2196F3),
-                    unfocusedBorderColor = Color.Gray,
-                    focusedLabelColor = Color(0xFF2196F3)
-                )
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            OutlinedTextField(
-                value = confirmPassword,
-                onValueChange = { confirmPassword = it },
-                label = { Text("Confirm Password", color = Color.LightGray) },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                visualTransformation = PasswordVisualTransformation(),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
-                    focusedBorderColor = Color(0xFF2196F3),
-                    unfocusedBorderColor = Color.Gray,
-                    focusedLabelColor = Color(0xFF2196F3)
-                )
+            Text(
+                text = "Join Travelock and start unlocking Helsinki",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             Spacer(modifier = Modifier.height(24.dp))
 
+            if (!errorMessage.isNullOrBlank()) {
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp)
+                ) {
+                    Text(
+                        text = errorMessage,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(12.dp)
+                    )
+                }
+            }
+
+            OutlinedTextField(
+                value = username,
+                onValueChange = { username = it },
+                label = { Text("Username") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                shape = MaterialTheme.shapes.medium
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            OutlinedTextField(
+                value = fullName,
+                onValueChange = { fullName = it },
+                label = { Text("Full Name") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                shape = MaterialTheme.shapes.medium
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            OutlinedTextField(
+                value = email,
+                onValueChange = { email = it },
+                label = { Text("Email") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                shape = MaterialTheme.shapes.medium
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            OutlinedTextField(
+                value = password,
+                onValueChange = { password = it },
+                label = { Text("Password") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation(),
+                shape = MaterialTheme.shapes.medium
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            OutlinedTextField(
+                value = confirmPassword,
+                onValueChange = { confirmPassword = it },
+                label = { Text("Confirm Password") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation(),
+                shape = MaterialTheme.shapes.medium
+            )
+
+            Spacer(modifier = Modifier.height(22.dp))
+
             Button(
-                onClick = { onRegisterClick(email, password) },
+                onClick = {
+                    if (onRegisterFullClick != null) {
+                        onRegisterFullClick(email, password, confirmPassword, username, fullName)
+                    } else {
+                        onRegisterClick(email, password)
+                    }
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp),
+                shape = MaterialTheme.shapes.medium,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF2196F3),
-                    contentColor = Color.White
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
                 )
             ) {
                 Text(text = "Register", fontSize = 16.sp, fontWeight = FontWeight.Bold)
@@ -111,8 +165,40 @@ fun RegisterScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
+            OutlinedButton(
+                onClick = onGoogleSignInClick,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp),
+                shape = MaterialTheme.shapes.medium,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.AccountCircle,
+                    contentDescription = null,
+                    modifier = Modifier.padding(end = 8.dp)
+                )
+                Text(
+                    text = "Sign up with Google",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            TextButton(onClick = onNavigateToLogin) {
+                Text(
+                    text = "Already have an account? Log In",
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+
             TextButton(onClick = onNavigateBack) {
-                Text(text = "Already have an account? Log In", color = Color(0xFF2196F3))
+                Text(
+                    text = "Back to Landing Page",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }
@@ -121,5 +207,7 @@ fun RegisterScreen(
 @Preview(showBackground = true)
 @Composable
 fun RegisterScreenPreview() {
-    RegisterScreen()
+    TravelockTheme(themeMode = ThemeMode.LIGHT) {
+        RegisterScreen()
+    }
 }
