@@ -1,3 +1,12 @@
 <resources>
     <string name="app_name">Travelock</string>
+    <string name="visit_photo_take">Take visit photo</string>
+    <string name="visit_photo_preparing">Preparing photo&#8230;</string>
+    <string name="visit_photo_failed">Could not prepare the photo. Please take it again.</string>
+    <string name="visit_photo_visit_changed">This visit has changed. Please take a new photo.</string>
+    <string name="visit_camera_unavailable">Could not open the camera. Please try again.</string>
+    <string name="visit_qr_scan">Scan destination QR</string>
+    <string name="visit_qr_scanning">Scanning&#8230;</string>
+    <string name="visit_qr_invalid">The QR code contains no readable text. Please try another code.</string>
+    <string name="visit_qr_unavailable">Could not open the QR scanner. Check your connection and Google Play services, then try again.</string>
 </resources>

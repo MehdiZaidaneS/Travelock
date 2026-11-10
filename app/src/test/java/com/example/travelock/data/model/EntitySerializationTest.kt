@@ -13,6 +13,152 @@ class EntitySerializationTest {
     private val json = Json { ignoreUnknownKeys = true }
 
     @Test
+    fun friendshipDecodesPendingAndAnsweredRequests() {
+        val pending = json.decodeFromString<Friendship>(
+            """
+            {
+              "friendship_id": "request-1", "requester_id": "user-a", "recipient_id": "user-b",
+              "status": "pending", "created_at": "2026-11-10T00:45:00.123456+02:00",
+              "responded_at": null
+            }
+            """.trimIndent(),
+        )
+        assertEquals("request-1", pending.friendshipId)
+        assertEquals("user-a", pending.requesterId)
+        assertEquals("user-b", pending.recipientId)
+        assertEquals("pending", pending.status)
+        assertEquals(Instant.parse("2026-11-09T22:45:00.123456Z"), pending.createdAt)
+        assertNull(pending.respondedAt)
+        assertEquals(pending, json.decodeFromString<Friendship>(json.encodeToString(pending)))
+        for (status in listOf("accepted", "rejected")) {
+            val answered = pending.copy(status = status, respondedAt = Instant.parse("2026-11-09T22:46:00Z"))
+            assertEquals(answered, json.decodeFromString<Friendship>(json.encodeToString(answered)))
+        }
+    }
+
+    @Test
+    fun postDecodesDatabaseRowWithoutSocialRelations() {
+        val post = json.decodeFromString<Post>(
+            """
+            {
+              "post_id": "post-1", "user_id": "user-1", "destination_id": "destination-1",
+              "image": "user-1/post-1/photo.jpg", "image_description": "A library visit",
+              "created_at": "2026-11-10T00:45:00.123456+02:00"
+            }
+            """.trimIndent(),
+        )
+        assertEquals("post-1", post.postId)
+        assertEquals("user-1/post-1/photo.jpg", post.image)
+        assertEquals("A library visit", post.imageDescription)
+        assertEquals(Instant.parse("2026-11-09T22:45:00.123456Z"), post.createdAt)
+        assertEquals(emptyList<User>(), post.likes)
+        assertEquals(emptyList<Comment>(), post.comments)
+        assertEquals(post, json.decodeFromString<Post>(json.encodeToString(post)))
+    }
+
+    @Test
+    fun unlockDecodesJoinedDestinationAndPreservesPlainResponses() {
+        val unlock = json.decodeFromString<UserUnlock>(
+            """
+            {
+              "unlock_id": "unlock-1", "user_id": "user-1", "destination_id": "destination-1",
+              "unlocked_at": "2026-11-10T00:15:00.123456+02:00",
+              "destination": {
+                "destination_id": "destination-1", "location_id": "location-1",
+                "name": "Oodi Library", "description": "Library visit", "discount": 0,
+                "latitude": 60.1738, "longitude": 24.9381, "image": "oodi.jpg",
+                "qr_code": "TEST-OODI-001"
+              }
+            }
+            """.trimIndent(),
+        )
+        val destination = checkNotNull(unlock.destination)
+        assertEquals(unlock.destinationId, destination.destinationId)
+        assertEquals("Oodi Library", destination.name)
+        assertEquals("Library visit", destination.description)
+        assertEquals("oodi.jpg", destination.image)
+        assertEquals(Instant.parse("2026-11-09T22:15:00.123456Z"), unlock.unlockedAt)
+        assertEquals(unlock, json.decodeFromString<UserUnlock>(json.encodeToString(unlock)))
+        val plain = unlock.copy(destination = null)
+        assertEquals(plain, json.decodeFromString<UserUnlock>(json.encodeToString(plain)))
+    }
+
+    @Test
+    fun enrolmentDecodesDatabaseColumnsAndTimestamp() {
+        val enrolment = json.decodeFromString<UserEnrolment>(
+            """
+            {
+              "enrolment_id": "enrolment-1", "user_id": "user-1",
+              "destination_id": "destination-1", "enrolled_at": "2026-11-10T00:15:00.123456+02:00"
+            }
+            """.trimIndent(),
+        )
+        assertEquals("enrolment-1", enrolment.enrolmentId)
+        assertEquals("user-1", enrolment.userId)
+        assertEquals("destination-1", enrolment.destinationId)
+        assertEquals(Instant.parse("2026-11-09T22:15:00.123456Z"), enrolment.enrolledAt)
+        assertNull(enrolment.destination)
+        assertEquals(enrolment, json.decodeFromString<UserEnrolment>(json.encodeToString(enrolment)))
+    }
+
+    @Test
+    fun enrolmentDecodesJoinedDestinationObject() {
+        val enrolment = json.decodeFromString<UserEnrolment>(
+            """
+            {
+              "enrolment_id": "enrolment-1", "user_id": "user-1",
+              "destination_id": "destination-1", "enrolled_at": "2026-11-10T00:15:00Z",
+              "destination": {
+                "destination_id": "destination-1", "location_id": "location-1",
+                "name": "Oodi Library", "description": "Library visit", "discount": 0,
+                "latitude": 60.1738, "longitude": 24.9381, "image": "oodi.jpg",
+                "qr_code": "TEST-OODI-001"
+              }
+            }
+            """.trimIndent(),
+        )
+        val destination = checkNotNull(enrolment.destination)
+        assertEquals(enrolment.destinationId, destination.destinationId)
+        assertEquals("Oodi Library", destination.name)
+        assertEquals("Library visit", destination.description)
+        assertEquals("oodi.jpg", destination.image)
+        assertEquals(enrolment, json.decodeFromString<UserEnrolment>(json.encodeToString(enrolment)))
+    }
+
+    @Test
+    fun visitAttemptDecodesPendingAndCompletedDatabaseResponses() {
+        val pending = json.decodeFromString<VisitAttempt>(
+            """
+            {
+              "visit_id": "visit-1", "user_id": "user-1", "destination_id": "destination-1",
+              "started_at": "2026-11-09T15:00:00.123456+00:00",
+              "completed_at": null, "photo_path": null
+            }
+            """.trimIndent(),
+        )
+        assertEquals(Instant.parse("2026-11-09T15:00:00.123456Z"), pending.startedAt)
+        assertNull(pending.completedAt)
+        assertNull(pending.photoPath)
+        assertNull(pending.cancelledAt)
+        val cancelled = pending.copy(cancelledAt = Instant.parse("2026-11-10T12:00:00Z"))
+        assertEquals(cancelled, json.decodeFromString<VisitAttempt>(json.encodeToString(cancelled)))
+
+        val completed = json.decodeFromString<VisitAttempt>(
+            """
+            {
+              "visit_id": "visit-1", "user_id": "user-1", "destination_id": "destination-1",
+              "started_at": "2026-11-09T15:00:00.123456+00:00",
+              "completed_at": "2026-11-09T15:01:00+00:00",
+              "photo_path": "user-1/visit-1/photo.jpg"
+            }
+            """.trimIndent(),
+        )
+        assertEquals(Instant.parse("2026-11-09T15:01:00Z"), completed.completedAt)
+        assertEquals("user-1/visit-1/photo.jpg", completed.photoPath)
+        assertEquals(completed, json.decodeFromString<VisitAttempt>(json.encodeToString(completed)))
+    }
+
+    @Test
     fun locationDecodesRelatedDestinationAndPercentageDiscount() {
         val location = json.decodeFromString<Location>(
             """

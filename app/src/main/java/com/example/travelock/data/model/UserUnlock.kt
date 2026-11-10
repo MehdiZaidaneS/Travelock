@@ -15,4 +15,6 @@ data class UserUnlock(
     @SerialName("unlocked_at")
     @Serializable(with = InstantSerializer::class)
     val unlockedAt: Instant,
+    // Filled when the query includes the related destination.
+    val destination: Destination? = null,
 )

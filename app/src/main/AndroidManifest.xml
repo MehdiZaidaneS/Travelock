@@ -15,6 +15,18 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.Travelock">
+        <meta-data
+            android:name="com.google.mlkit.vision.DEPENDENCIES"
+            android:value="barcode_ui" />
+        <provider
+            android:name=".data.camera.VisitPhotoFileProvider"
+            android:authorities="${applicationId}.visitphotos"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/visit_photo_paths" />
+        </provider>
         <activity
             android:name=".MainActivity"
             android:exported="true"

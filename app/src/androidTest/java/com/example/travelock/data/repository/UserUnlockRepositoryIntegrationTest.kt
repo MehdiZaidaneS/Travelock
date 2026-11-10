@@ -1,17 +1,24 @@
 package com.example.travelock.data.repository
 
+import android.graphics.Bitmap
+import android.graphics.Color
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.example.travelock.data.SupabaseProvider
 import com.example.travelock.data.model.Destination
 import com.example.travelock.data.model.UserUnlock
+import com.example.travelock.data.model.VisitAttempt
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.exception.PostgrestRestException
+import io.github.jan.supabase.storage.storage
 import java.util.UUID
+import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.CancellationException
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
@@ -75,22 +82,136 @@ class UserUnlockRepositoryIntegrationTest {
                 }
                 .decodeSingle<Destination>()
             val repository = UserUnlockRepository()
-            val firstScan = repository.unlockDestination(destination.qrCode)
-            val repeatedScan = repository.unlockDestination(destination.qrCode)
+            val detailedUnlocks = repository.getMyUnlocksWithDestinations()
+            assertEquals(ownUnlocks.toSet(), detailedUnlocks.map { it.copy(destination = null) }.toSet())
+            assertTrue(detailedUnlocks.all { it.userId == user.id })
+            assertEquals(destination, detailedUnlocks.single { it.destinationId == destinationId }.destination)
+            assertTrue(detailedUnlocks.all { it.destination?.destinationId == it.destinationId })
+            // Starting creates a pending attempt, but must not award an unlock.
+            val visit = repository.startVisit(destination.qrCode)
+            assertEquals(user.id, visit.userId)
+            assertEquals(destinationId, visit.destinationId)
+            assertNull(visit.completedAt)
+            assertNull(visit.photoPath)
+            assertEquals(ownUnlocks.toSet(), repository.getMyUnlocks().toSet())
 
-            // The seeded unlock must keep its ID, owner, destination and timestamp.
-            assertEquals(visibleUnlocks.single(), firstScan)
-            assertEquals(firstScan, repeatedScan)
+            suspend fun assertVisitStillPending() {
+                val saved = supabase.from("visit_attempts").select {
+                    filter { eq("visit_id", visit.visitId) }
+                }.decodeSingle<VisitAttempt>()
+                assertNull("A rejected completion must leave the attempt pending.", saved.completedAt)
+                assertNull("A rejected completion must not attach a photo.", saved.photoPath)
+                assertEquals(ownUnlocks.toSet(), repository.getMyUnlocks().toSet())
+            }
+
+            val attemptsBeforeInvalidQr = supabase.from("visit_attempts").select {
+                filter { eq("user_id", user.id) }
+            }.decodeList<VisitAttempt>().toSet()
 
             try {
-                repository.unlockDestination("INVALID-TEST-${UUID.randomUUID()}")
+                repository.startVisit("INVALID-TEST-${UUID.randomUUID()}")
                 fail("An unknown QR code must be rejected by the database.")
             } catch (error: PostgrestRestException) {
                 assertEquals("22023", error.code)
                 assertTrue(error.message.orEmpty().contains("Invalid QR code."))
             }
+            assertEquals(
+                "An invalid QR must not create an attempt.",
+                attemptsBeforeInvalidQr,
+                supabase.from("visit_attempts").select {
+                    filter { eq("user_id", user.id) }
+                }.decodeList<VisitAttempt>().toSet(),
+            )
+            assertVisitStillPending()
 
-            // Neither a repeated scan nor a rejected code should change the unlocks.
+            try {
+                repository.completeVisit(
+                    visitId = visit.visitId,
+                    photoPath = "${user.id}/${visit.visitId}/missing.jpg",
+                    latitude = destination.latitude,
+                    longitude = destination.longitude,
+                )
+                fail("Completing a visit without an uploaded photo must be rejected.")
+            } catch (error: PostgrestRestException) {
+                assertEquals("22023", error.code)
+                assertTrue(error.message.orEmpty().contains("Upload a photo"))
+            }
+            assertVisitStillPending()
+
+            // A small synthetic JPEG tests Storage/API wiring, not live camera capture.
+            // The private uploaded test photo and completed attempt are kept afterward.
+            val bitmap = Bitmap.createBitmap(8, 8, Bitmap.Config.ARGB_8888)
+            val photoBytes = try {
+                bitmap.eraseColor(Color.BLUE)
+                ByteArrayOutputStream().use { output ->
+                    check(bitmap.compress(Bitmap.CompressFormat.JPEG, 90, output))
+                    output.toByteArray()
+                }
+            } finally {
+                bitmap.recycle()
+            }
+            val photoPath = VisitPhotoRepository().uploadPhoto(visit, photoBytes)
+            assertTrue(photoPath.startsWith("${user.id}/${visit.visitId}/"))
+
+            // Just beyond the boundary, rather than only testing a distant city.
+            val latitudeOffset = Math.toDegrees(51.0 / 6_371_000.0)
+            val outsideLatitude = destination.latitude +
+                if (destination.latitude >= 0) -latitudeOffset else latitudeOffset
+            try {
+                repository.completeVisit(
+                    visit.visitId,
+                    photoPath,
+                    outsideLatitude,
+                    destination.longitude,
+                )
+                fail("Completing a visit far from the destination must be rejected.")
+            } catch (error: PostgrestRestException) {
+                assertEquals("22023", error.code)
+                assertTrue(error.message.orEmpty().contains("within 50 metres"))
+            }
+            // Check before the successful retry: rejection must not partially save
+            // completion details or alter an existing unlock.
+            assertVisitStillPending()
+
+            val completed = repository.completeVisit(
+                visit.visitId, photoPath, destination.latitude, destination.longitude,
+            )
+            val repeated = repository.completeVisit(
+                visit.visitId, photoPath, destination.latitude, destination.longitude,
+            )
+            assertEquals(visibleUnlocks.single(), completed)
+            assertEquals(completed, repeated)
+
+            // The existing fixture keeps its original unlock ID and timestamp.
+            assertEquals(ownUnlocks.toSet(), repository.getMyUnlocks().toSet())
+
+            // These temporary images exercise the actual Storage API. Only the
+            // cancelled attempt's files are removed; completed photos stay private.
+            val photos = VisitPhotoRepository()
+            val bucket = supabase.storage.from("visit-photos")
+            suspend fun assertProtected(path: String) {
+                try {
+                    bucket.delete(listOf(path))
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (_: Exception) {
+                    // Storage may reject the request or return no deleted objects.
+                }
+                assertTrue("An active/completed visit photo must remain present.",
+                    bucket.list(path.substringBeforeLast('/')).any { it.name == path.substringAfterLast('/') })
+            }
+            assertProtected(photoPath)
+            val cleanupVisit = repository.startVisit(destination.qrCode)
+            val cleanupPath = photos.uploadPhoto(cleanupVisit, photoBytes)
+            photos.uploadPhoto(cleanupVisit, photoBytes)
+            assertProtected(cleanupPath)
+            val cancelledVisit = repository.cancelVisit(cleanupVisit.visitId)
+            photos.deleteCancelledVisitPhotos(cancelledVisit)
+            photos.deleteCancelledVisitPhotos(cancelledVisit)
+            assertTrue("Cancelled visit folder must be empty after cleanup.",
+                bucket.list("${user.id}/${cleanupVisit.visitId}").isEmpty())
+            assertTrue("Cleanup must preserve the completed visit photo.",
+                bucket.list("${user.id}/${visit.visitId}").any { it.name == photoPath.substringAfterLast('/') })
             assertEquals(ownUnlocks.toSet(), repository.getMyUnlocks().toSet())
         } finally {
             supabase.auth.signOut()
