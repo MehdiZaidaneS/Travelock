@@ -4,42 +4,36 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.runtime.*
-import androidx.compose.ui.Modifier
-import com.example.travelock.ui.auth.LandingScreen
-import com.example.travelock.ui.auth.LoginScreen
-import com.example.travelock.ui.auth.RegisterScreen
+import androidx.activity.viewModels
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import com.example.travelock.navigation.TravelockNavGraph
 import com.example.travelock.ui.theme.TravelockTheme
+import com.example.travelock.ui.viewmodel.ThemeViewModel
+import com.example.travelock.util.DataStoreManager
 
 class MainActivity : ComponentActivity() {
+
+    private val themeViewModel: ThemeViewModel by viewModels {
+        val app = application as? TravelockApplication
+        val dataStoreManager = app?.dataStoreManager ?: DataStoreManager(applicationContext)
+        ThemeViewModel.Factory(dataStoreManager)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            TravelockTheme {
-                // State to keep track of which screen is currently displayed
-                var currentScreen by remember { mutableStateOf("landing") }
+            val themeMode by themeViewModel.themeMode.collectAsState()
 
-                // Switch between screens based on user interaction
-                when (currentScreen) {
-                    "landing" -> LandingScreen(
-                        onNavigateToLogin = { currentScreen = "login" },
-                        onNavigateToRegister = { currentScreen = "register" }
-                    )
-                    "login" -> LoginScreen(
-                        onLoginClick = { email, password ->
-                            // TODO: Add Supabase login authentication logic later in Sprint 2/3
-                        },
-                        onNavigateBack = { currentScreen = "landing" }
-                    )
-                    "register" -> RegisterScreen(
-                        onRegisterClick = { email, password ->
-                            // TODO: Add Supabase registration logic later in Sprint 2/3
-                        },
-                        onNavigateBack = { currentScreen = "landing" }
-                    )
-                }
+            TravelockTheme(
+                themeMode = themeMode,
+                onThemeModeChange = { themeViewModel.setThemeMode(it) }
+            ) {
+                TravelockNavGraph(
+                    currentThemeMode = themeMode,
+                    onThemeModeChange = { themeViewModel.setThemeMode(it) }
+                )
             }
         }
     }
