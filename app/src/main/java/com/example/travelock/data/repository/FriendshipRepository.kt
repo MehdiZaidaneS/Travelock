@@ -1,6 +1,7 @@
 package com.example.travelock.data.repository
 
 import com.example.travelock.data.SupabaseProvider
+import com.example.travelock.data.model.FriendListItem
 import com.example.travelock.data.model.Friendship
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.from
@@ -11,6 +12,21 @@ import kotlinx.serialization.json.put
 
 class FriendshipRepository {
     private val supabase = SupabaseProvider.client
+
+    suspend fun getMyFriends(): List<FriendListItem> {
+        signedInUserId()
+        return supabase.postgrest.rpc("get_my_friends").decodeList<FriendListItem>()
+    }
+
+    // True when removed; false if this accepted relationship no longer exists.
+    // Pass the friendship ID from the list, rather than the other user's ID.
+    suspend fun removeFriend(friendshipId: String): Boolean {
+        require(friendshipId.isNotBlank()) { "Friendship ID cannot be blank." }
+        signedInUserId()
+        return supabase.postgrest.rpc("remove_friend", buildJsonObject {
+            put("relationship_id", friendshipId)
+        }).decodeAs<Boolean>()
+    }
 
     suspend fun sendFriendRequest(targetUserId: String): Friendship {
         require(targetUserId.isNotBlank()) { "Target user ID cannot be blank." }

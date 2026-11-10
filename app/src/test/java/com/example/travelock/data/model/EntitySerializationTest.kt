@@ -13,6 +13,17 @@ class EntitySerializationTest {
     private val json = Json { ignoreUnknownKeys = true }
 
     @Test
+    fun friendListItemHandlesUnfinishedProfiles() {
+        val item = json.decodeFromString<FriendListItem>(
+            """{"friendship_id":"relationship","user_id":"friend","profile":null}""",
+        )
+        assertEquals("friend", item.userId)
+        assertNull(item.profile)
+        val ready = item.copy(profile = ProfileSummary("friend", "friend", "Friend", "image"))
+        assertEquals(ready, json.decodeFromString<FriendListItem>(json.encodeToString(ready)))
+    }
+
+    @Test
     fun friendTravelProfileDecodesEmptyHistoryAndMissingProfile() {
         val payload = """{"profile":{"user_id":"friend","username":"friend","name":"Friend","profile_image":""},"achievements":[],"unlocks":[]}"""
         val profile = json.decodeFromString<FriendTravelProfile>(payload)
