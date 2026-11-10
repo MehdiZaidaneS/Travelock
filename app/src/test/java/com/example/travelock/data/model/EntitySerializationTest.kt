@@ -13,6 +13,30 @@ class EntitySerializationTest {
     private val json = Json { ignoreUnknownKeys = true }
 
     @Test
+    fun friendshipDecodesPendingAndAnsweredRequests() {
+        val pending = json.decodeFromString<Friendship>(
+            """
+            {
+              "friendship_id": "request-1", "requester_id": "user-a", "recipient_id": "user-b",
+              "status": "pending", "created_at": "2026-11-10T00:45:00.123456+02:00",
+              "responded_at": null
+            }
+            """.trimIndent(),
+        )
+        assertEquals("request-1", pending.friendshipId)
+        assertEquals("user-a", pending.requesterId)
+        assertEquals("user-b", pending.recipientId)
+        assertEquals("pending", pending.status)
+        assertEquals(Instant.parse("2026-11-09T22:45:00.123456Z"), pending.createdAt)
+        assertNull(pending.respondedAt)
+        assertEquals(pending, json.decodeFromString<Friendship>(json.encodeToString(pending)))
+        for (status in listOf("accepted", "rejected")) {
+            val answered = pending.copy(status = status, respondedAt = Instant.parse("2026-11-09T22:46:00Z"))
+            assertEquals(answered, json.decodeFromString<Friendship>(json.encodeToString(answered)))
+        }
+    }
+
+    @Test
     fun postDecodesDatabaseRowWithoutSocialRelations() {
         val post = json.decodeFromString<Post>(
             """
