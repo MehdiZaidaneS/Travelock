@@ -18,7 +18,7 @@ import androidx.compose.ui.Modifier
 fun TravelockSearchBar(
     query: String,
     onQueryChange: (String) -> Unit,
-    placeholderText: String = "Search locations in Helsinki (e.g. Kallio)...",
+    placeholderText: String = "Search locations (e.g. Kallio)...",
     modifier: Modifier = Modifier
 ) {
     OutlinedTextField(

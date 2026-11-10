@@ -25,13 +25,13 @@ fun ExtendedLocationCard(
     location: Location,
     isLocked: Boolean,
     onBack: () -> Unit,
+    onDestinationSelected: (Destination) -> Unit,
     modifier: Modifier = Modifier
 ) {
 
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
-            .background(Color.Black)
     ) {
 
         // LOCATION IMAGE
@@ -41,7 +41,6 @@ fun ExtendedLocationCard(
                     .fillMaxWidth()
                     .height(280.dp)
             ) {
-
                 AsyncImage(
                     model = location.image,
                     contentDescription = location.name,
@@ -56,9 +55,9 @@ fun ExtendedLocationCard(
                         .background(
                             Brush.verticalGradient(
                                 colors = listOf(
-                                    Color.Black.copy(alpha = 0.3f),
+                                    Color.White.copy(alpha = 0.3f),
                                     Color.Transparent,
-                                    Color.Black.copy(alpha = 0.8f)
+                                    Color.White.copy(alpha = 0.8f)
                                 )
                             )
                         )
@@ -71,14 +70,13 @@ fun ExtendedLocationCard(
                         .align(Alignment.TopStart)
                         .padding(16.dp)
                         .background(
-                            Color.Black.copy(alpha = 0.7f),
+                            Color.White.copy(alpha = 0.7f),
                             RoundedCornerShape(50)
                         )
                 ) {
                     Icon(
                         imageVector = Icons.Default.ArrowBack,
                         contentDescription = "Go back",
-                        tint = Color.White
                     )
                 }
 
@@ -90,7 +88,6 @@ fun ExtendedLocationCard(
                         .padding(20.dp),
                     style = MaterialTheme.typography.headlineLarge,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
                 )
             }
         }
@@ -101,18 +98,16 @@ fun ExtendedLocationCard(
                 modifier = Modifier.padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-
                 Text(
                     text = location.description,
                     style = MaterialTheme.typography.bodyLarge,
-                    color = Color.LightGray
+                    color = Color.Black
                 )
 
                 // DESTINATIONS HEADING
                 Text(
                     text = "Destinations",
                     style = MaterialTheme.typography.titleLarge,
-                    color = Color.White,
                     fontWeight = FontWeight.Bold
                 )
 
@@ -121,14 +116,13 @@ fun ExtendedLocationCard(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-
                     Icon(
                         imageVector = if (isLocked)
                             Icons.Default.Lock
                         else
                             Icons.Default.LockOpen,
                         contentDescription = null,
-                        tint = Color.White
+
                     )
 
                     Text(
@@ -136,7 +130,6 @@ fun ExtendedLocationCard(
                             "${location.destinations.size}/3 destinations to unlock..."
                         else
                             "Keep discovering ${location.name}",
-                        color = Color.White,
                         fontWeight = FontWeight.SemiBold
                     )
                 }
@@ -151,12 +144,14 @@ fun ExtendedLocationCard(
                     .padding(horizontal = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-
                 location.destinations.forEach { destination ->
 
                     DestinationCard(
                         destination = destination,
-                        isLocked = true
+                        isLocked = true,
+                        onClick = {
+                            onDestinationSelected(destination)
+                        }
                     )
                 }
             }

@@ -1,4 +1,3 @@
-
 package com.example.travelock.home
 
 import androidx.compose.foundation.background
@@ -20,6 +19,7 @@ fun HomePage(
     locationClose: Location,
     nextLocations: List<Location>,
     onLocationSelected: (Location) -> Unit,
+    onDestinationSelected: (Destination) -> Unit,
     modifier: Modifier = Modifier
 ) {
 
@@ -33,8 +33,7 @@ fun HomePage(
 
     LazyColumn(
         modifier = modifier
-            .fillMaxSize()
-            .background(Color(0xFF101010)),
+            .fillMaxSize(),
         contentPadding = PaddingValues(
             horizontal = 20.dp,
             vertical = 24.dp
@@ -51,45 +50,49 @@ fun HomePage(
         }
 
         if (searchQuery == "")
-        item {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                Column {
-                    Text(
-                        text = "Enjoy these promotions",
-                        color = Color.White,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
+            item {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Column {
+                        Text(
+                            text = "Enjoy these promotions",
+                            color = Color.Black,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
 
-                    Text(
-                        text = "Discover places and save money",
-                        color = Color.Gray,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
+                        Text(
+                            text = "Discover places and save money",
+                            color = Color.Gray,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
 
-                if (destinations.isEmpty()) {
-                    Text(
-                        text = "No promotions found.",
-                        color = Color.Gray
-                    )
-                } else {
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(14.dp)
-                    ) {
-                        items(destinations) { destination ->
-                            DestinationCard(
-                                destination = destination,
-                                isLocked = true,
-                                modifier = Modifier.width(300.dp)
-                            )
+                    if (destinations.isEmpty()) {
+                        Text(
+                            text = "No promotions found.",
+                            color = Color.Gray
+                        )
+                    } else {
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            items(destinations) { destination ->
+
+                                DestinationCard(
+                                    destination = destination,
+                                    isLocked = true,
+                                    onClick = {
+                                        onDestinationSelected(destination)
+                                    },
+                                    modifier = Modifier.width(300.dp)
+                                )
+                            }
                         }
                     }
                 }
             }
-        }
 
         // NEXT TARGETS
         item {
@@ -97,20 +100,20 @@ fun HomePage(
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 if (searchQuery == "")
-                Column {
-                    Text(
-                        text = "Your next targets",
-                        color = Color.White,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Column {
+                        Text(
+                            text = "Your next targets",
+                            color = Color.Black,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
 
-                    Text(
-                        text = "Discover new locations...",
-                        color = Color.Gray,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
+                        Text(
+                            text = "Discover new locations...",
+                            color = Color.Gray,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
 
                 if (filteredLocations.isEmpty()) {
                     Text(

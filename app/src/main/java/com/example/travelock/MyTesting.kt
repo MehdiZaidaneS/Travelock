@@ -3,6 +3,7 @@ package com.example.travelock
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
@@ -11,12 +12,15 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import com.example.travelock.home.ExtendedDestinationCard
 
 import com.example.travelock.home.Destination
 import com.example.travelock.home.ExtendedLocationCard
 import com.example.travelock.home.HomePage
 import com.example.travelock.home.Location
 import com.example.travelock.ui.theme.TravelockTheme
+import androidx.compose.foundation.layout.Box
+import androidx.compose.material3.MaterialTheme
 
 // HELSINKI DESTINATIONS
 val helsinkiDestinations = listOf(
@@ -154,40 +158,95 @@ class MyTesting : ComponentActivity() {
         setContent {
             TravelockTheme {
 
+                // Selected location
                 var selectedLocation by remember {
                     mutableStateOf<Location?>(null)
                 }
 
+                // Selected destination
+                var selectedDestination by remember {
+                    mutableStateOf<Destination?>(null)
+                }
+
+                BackHandler(
+                    enabled = selectedDestination != null || selectedLocation != null
+                ) {
+                    when {
+                        // If destination is open, close it first
+                        selectedDestination != null -> {
+                            selectedDestination = null
+                        }
+
+                        // If location is open, return to HomePage
+                        selectedLocation != null -> {
+                            selectedLocation = null
+                        }
+                    }
+                }
+
+
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
-                    containerColor = Color.Black
+                    containerColor = MaterialTheme.colorScheme.background
                 ) { innerPadding ->
 
-                    if (selectedLocation == null) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(innerPadding)
+                    ) {
 
-                        HomePage(
-                            destinations = destinations,
-                            locationClose = vantaa,
-                            nextLocations = nextLocations,
-                            onLocationSelected = { location ->
-                                selectedLocation = location
-                            },
-                            modifier = Modifier.padding(innerPadding)
-                        )
+                        // 1. Always display the underlying screen
+                        when {
+                            selectedLocation != null -> {
+                                ExtendedLocationCard(
+                                    location = selectedLocation!!,
+                                    isLocked = true,
+                                    onBack = {
+                                        selectedLocation = null
+                                    },
+                                    onDestinationSelected = { destination ->
+                                        selectedDestination = destination
+                                    },
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
 
-                    } else {
+                            else -> {
+                                HomePage(
+                                    destinations = destinations,
+                                    locationClose = vantaa,
+                                    nextLocations = nextLocations,
+                                    onLocationSelected = { location ->
+                                        selectedLocation = location
+                                    },
+                                    onDestinationSelected = { destination ->
+                                        selectedDestination = destination
+                                    },
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
+                        }
 
-                        ExtendedLocationCard(
-                            location = selectedLocation!!,
-                            isLocked = true,
-                            onBack = {
-                                selectedLocation = null
-                            },
-                            modifier = Modifier.padding(innerPadding)
-                        )
+                        // 2. Display destination as an overlay
+                        if (selectedDestination != null) {
+                            ExtendedDestinationCard(
+                                destination = selectedDestination!!,
+                                isLocked = true,
+                                onBack = {
+                                    selectedDestination = null
+                                },
+                                onUnlockCamera = {
+                                    // TODO: Open camera
+                                },
+                                onUnlockQr = {
+                                    // TODO: Open QR scanner
+                                }
+                            )
+                        }
                     }
-
                 }
+
             }
         }
     }

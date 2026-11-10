@@ -37,10 +37,12 @@ import coil.compose.AsyncImage
 fun DestinationCard(
     destination: Destination,
     isLocked: Boolean,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
 
     Card(
+        onClick = onClick,
         modifier = modifier
             .fillMaxWidth()
             .height(200.dp),
@@ -150,28 +152,26 @@ fun DestinationCard(
 
 
                     if (isLocked && destination.discount > 0)
-                    Text(
-                        text = "${destination.discount}% discount",
-                        color = Color(0xFF81C784),
-                        fontWeight = FontWeight.SemiBold
-                    )
+                        Text(
+                            text = "${destination.discount}% discount",
+                            color = Color(0xFF81C784),
+                            fontWeight = FontWeight.SemiBold
+                        )
 
                     if (isLocked)
-                    OutlinedButton(
-                        onClick = {
-                            // TODO: Implement unlock functionality
-                        },
-                        shape = RoundedCornerShape(10.dp),
-                        border = BorderStroke(1.dp, Color.White),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = Color.White
-                        )
-                    ) {
+                        OutlinedButton(
+                            onClick = onClick,
+                            shape = RoundedCornerShape(10.dp),
+                            border = BorderStroke(1.dp, Color.White),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = Color.White
+                            )
+                        ) {
                             Text(
                                 text = "Unlock",
                                 fontWeight = FontWeight.SemiBold
                             )
-                    }
+                        }
                 }
             }
         }
