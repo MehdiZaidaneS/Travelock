@@ -13,6 +13,16 @@ class EntitySerializationTest {
     private val json = Json { ignoreUnknownKeys = true }
 
     @Test
+    fun profileDiscoveryDecodesTableResultsWithoutFullProfileFields() {
+        val results = json.decodeFromString<List<ProfileSummary>>(
+            """[{"user_id":"user-b","username":"bob","name":"Bob","profile_image":""}]""",
+        )
+        assertEquals(listOf(ProfileSummary("user-b", "bob", "Bob", "")), results)
+        assertEquals(results, json.decodeFromString<List<ProfileSummary>>(json.encodeToString(results)))
+        assertEquals(emptyList<ProfileSummary>(), json.decodeFromString<List<ProfileSummary>>("[]"))
+    }
+
+    @Test
     fun friendshipDecodesPendingAndAnsweredRequests() {
         val pending = json.decodeFromString<Friendship>(
             """

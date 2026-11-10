@@ -2,14 +2,43 @@ package com.example.travelock.data.repository
 
 import com.example.travelock.data.SupabaseProvider
 import com.example.travelock.data.model.Profile
+import com.example.travelock.data.model.ProfileSummary
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 // Database errors are left for the caller to handle, such as a username already in use.
 class ProfileRepository {
     private val supabase = SupabaseProvider.client
+
+    // The server searches basic profile fields and returns up to 20 other users.
+    suspend fun searchProfiles(query: String): List<ProfileSummary> {
+        supabase.auth.awaitInitialization()
+        checkNotNull(supabase.auth.currentUserOrNull()) {
+            "You must sign in before searching for users."
+        }
+        val trimmed = query.trim()
+        if (trimmed.isEmpty()) return emptyList()
+
+        return supabase.postgrest.rpc("search_profiles", buildJsonObject {
+            put("search_query", trimmed)
+        }).decodeList<ProfileSummary>()
+    }
+
+    // A missing profile returns null. This does not load their posts or history.
+    suspend fun getProfileSummary(userId: String): ProfileSummary? {
+        require(userId.isNotBlank()) { "User ID cannot be blank." }
+        supabase.auth.awaitInitialization()
+        checkNotNull(supabase.auth.currentUserOrNull()) {
+            "You must sign in before viewing a profile."
+        }
+
+        return supabase.postgrest.rpc("get_profile_summary", buildJsonObject {
+            put("profile_user_id", userId)
+        }).decodeList<ProfileSummary>().singleOrNull()
+    }
 
     // A signed-in user may not have completed their profile yet, so this can return null.
     suspend fun getMyProfile(): Profile? {
