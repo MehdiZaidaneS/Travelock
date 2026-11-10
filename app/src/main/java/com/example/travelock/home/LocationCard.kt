@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material3.*
@@ -15,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -52,6 +54,7 @@ fun LocationCard(
 ){
 
     Card(
+        onClick = onViewDetails,
         modifier = modifier
             .fillMaxWidth()
             .height(200.dp),
@@ -145,6 +148,8 @@ fun LocationCard(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
 
+
+
                     Text(
                         text = location.name,
                         color = Color.White,
@@ -158,19 +163,15 @@ fun LocationCard(
                         style = MaterialTheme.typography.bodyMedium
                     )
 
-                    OutlinedButton(
-                        onClick = onViewDetails,
-                        shape = RoundedCornerShape(10.dp),
-                        border = BorderStroke(1.dp, Color.White),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = Color.White
-                        )
-                    ) {
+                    Row{
                         Text(
-                            text = "View Details",
-                            fontWeight = FontWeight.SemiBold
+                            text = "0/3 destinations unlocked",
+                            color = Color.White,
+                            fontStyle = FontStyle.Italic,
                         )
                     }
+
+
                 }
             }
         }
@@ -178,7 +179,4 @@ fun LocationCard(
 }
 
 
-fun DetailedLocationCard(location: Location, isLocked: Boolean,modifier: Modifier = Modifier){
-
-}
 

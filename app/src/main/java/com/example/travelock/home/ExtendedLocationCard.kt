@@ -4,7 +4,6 @@ package com.example.travelock.home
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -28,19 +27,21 @@ fun ExtendedLocationCard(
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
             .background(Color.Black)
     ) {
 
-        // Location image
+        // LOCATION IMAGE
         item {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(280.dp)
             ) {
+
                 AsyncImage(
                     model = location.image,
                     contentDescription = location.name,
@@ -63,7 +64,7 @@ fun ExtendedLocationCard(
                         )
                 )
 
-                // Back button
+                // BACK BUTTON
                 IconButton(
                     onClick = onBack,
                     modifier = Modifier
@@ -81,7 +82,7 @@ fun ExtendedLocationCard(
                     )
                 }
 
-                // Location name
+                // LOCATION NAME
                 Text(
                     text = location.name,
                     modifier = Modifier
@@ -94,18 +95,33 @@ fun ExtendedLocationCard(
             }
         }
 
-        // Location information
+        // LOCATION INFORMATION
         item {
             Column(
                 modifier = Modifier.padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
 
-                // Lock status
+                Text(
+                    text = location.description,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = Color.LightGray
+                )
+
+                // DESTINATIONS HEADING
+                Text(
+                    text = "Destinations",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
+
+                // LOCK STATUS
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+
                     Icon(
                         imageVector = if (isLocked)
                             Icons.Default.Lock
@@ -116,46 +132,37 @@ fun ExtendedLocationCard(
                     )
 
                     Text(
-                        text = if (isLocked) "3 destinations to more unlock..." else "Keep discovering ${location.name}",
+                        text = if (isLocked)
+                            "${location.destinations.size}/3 destinations to unlock..."
+                        else
+                            "Keep discovering ${location.name}",
                         color = Color.White,
                         fontWeight = FontWeight.SemiBold
                     )
                 }
-
-                HorizontalDivider(
-                    color = Color.DarkGray
-                )
-
-                // Description
-                Text(
-                    text = location.description,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = Color.LightGray
-                )
-
-                // Destinations heading
-                Text(
-                    text = "Destinations",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold
-                )
-
-
-
-                Text(
-                    text = "${location.destinations.size} destinations to explore",
-                    color = Color.Gray
-                )
             }
         }
 
-        // Destination list
-        items(location.destinations) { destination ->
+        // DESTINATION CARDS
+        item {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
 
-            DestinationCard(destination = destination, isLocked = true)
+                location.destinations.forEach { destination ->
+
+                    DestinationCard(
+                        destination = destination,
+                        isLocked = true
+                    )
+                }
+            }
         }
 
+        // BOTTOM SPACING
         item {
             Spacer(modifier = Modifier.height(24.dp))
         }
