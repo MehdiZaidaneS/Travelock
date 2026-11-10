@@ -13,6 +13,20 @@ class EntitySerializationTest {
     private val json = Json { ignoreUnknownKeys = true }
 
     @Test
+    fun notificationDecodesCommentAndRequestTargetsWithLegacyDefaults() {
+        val base = """{"notification_id":"n","sender_id":"a","receiver_id":"b","type":"like","message":"Liked your post.","is_read":false,"created_at":"2026-11-10T00:00:00Z","post_id":"p"}"""
+        val like = json.decodeFromString<Notification>(base)
+        assertNull(like.commentId)
+        assertNull(like.friendshipId)
+        val comment = like.copy(type = "comment", commentId = "c")
+        val request = like.copy(type = "friend_request", postId = null, friendshipId = "f")
+        assertEquals(comment, json.decodeFromString<Notification>(json.encodeToString(comment)))
+        assertEquals(request, json.decodeFromString<Notification>(json.encodeToString(request)))
+        assertEquals("c", comment.commentId)
+        assertEquals("f", request.friendshipId)
+    }
+
+    @Test
     fun interactionSummaryDecodesBigintCountsAndCurrentActorState() {
         val summary = json.decodeFromString<PostInteractionSummary>(
             """{"like_count":123456789012,"comment_count":42,"is_liked_by_me":true}""",

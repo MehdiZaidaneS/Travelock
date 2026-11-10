@@ -22,4 +22,8 @@ data class Notification(
     // Friend-request notifications, for example, need not reference a post.
     @SerialName("post_id")
     val postId: String? = null,
+    @SerialName("comment_id")
+    val commentId: String? = null,
+    @SerialName("friendship_id")
+    val friendshipId: String? = null,
 )
