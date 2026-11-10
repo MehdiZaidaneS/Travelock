@@ -13,6 +13,19 @@ class EntitySerializationTest {
     private val json = Json { ignoreUnknownKeys = true }
 
     @Test
+    fun locationProgressDecodesLockedAndEarnedStates() {
+        val base = """{"location_id":"l","location_name":"Helsinki","total_destinations":2,"verified_destinations":1,"is_complete":false,"is_earned":false,"achievement_name":"Explore Helsinki","achievement_description":"Verify every destination in Helsinki."}"""
+        val locked = json.decodeFromString<LocationProgress>(base)
+        assertEquals(2L, locked.totalDestinations)
+        assertEquals(1L, locked.verifiedDestinations)
+        assertNull(locked.achievementId)
+        assertNull(locked.unlockedAt)
+        val earned = locked.copy(isEarned = true, achievementId = "a", unlockedAt = Instant.parse("2026-11-10T00:00:00Z"))
+        assertEquals(earned, json.decodeFromString<LocationProgress>(json.encodeToString(earned)))
+        assertFalse(earned.isComplete)
+    }
+
+    @Test
     fun notificationDecodesCommentAndRequestTargetsWithLegacyDefaults() {
         val base = """{"notification_id":"n","sender_id":"a","receiver_id":"b","type":"like","message":"Liked your post.","is_read":false,"created_at":"2026-11-10T00:00:00Z","post_id":"p"}"""
         val like = json.decodeFromString<Notification>(base)
