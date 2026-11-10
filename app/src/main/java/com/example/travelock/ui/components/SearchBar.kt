@@ -13,14 +13,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 
-/**
- * PBI-07: Reusable Search Bar for searching Helsinki locations or users.
- */
+
 @Composable
 fun TravelockSearchBar(
     query: String,
     onQueryChange: (String) -> Unit,
-    placeholderText: String = "Search locations in Helsinki (e.g. Kallio)...",
+    placeholderText: String = "Search locations (e.g. Kallio)...",
     modifier: Modifier = Modifier
 ) {
     OutlinedTextField(
@@ -60,4 +58,3 @@ fun TravelockSearchBar(
         )
     )
 }
-

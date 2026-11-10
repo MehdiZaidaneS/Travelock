@@ -1,18 +1,9 @@
+
 package com.example.travelock.ui.screens.map
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -23,24 +14,8 @@ import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Route
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -54,67 +29,82 @@ import com.example.travelock.data.mock.MockSessionState
 import com.example.travelock.data.model.Destination
 import com.example.travelock.data.model.UserAchievement
 import com.example.travelock.data.repository.ExploreRepository
-import com.example.travelock.ui.components.DestinationCardExpanded
+import com.example.travelock.ui.components.ExtendedDestinationCard
 import com.example.travelock.util.DistanceCalculator
 import kotlinx.coroutines.launch
 
-/**
- * PBI-20 to PBI-25: Interactive Map & Route Planning Screen (Steps 18–20 of Travelock.pdf).
- * - Displays an interactive visual Helsinki Map Canvas without requiring an external Google Maps API key.
- * - Shows the user's current GPS position (PBI-20), locked vs. unlocked destination markers (PBI-21, PBI-25),
- *   and a multi-stop route builder that draws a polyline between selected destinations (PBI-22, PBI-23)
- *   and calculates the total route distance in metres/kilometres (PBI-24).
- * - Clicking a destination opens [DestinationCardExpanded] to unlock it with QR or Photo (Step 20).
- */
 @Composable
 fun MapScreen(
     exploreRepository: ExploreRepository = remember { ExploreRepository() }
 ) {
-    // TODO: GOOGLE_MAPS / SUPABASE - Replace Canvas mock map with GoogleMap() composable once Maps API key is added,
-    // using DeviceLocationProvider for live GPS coordinates and DestinationRepository for markers.
     val scope = rememberCoroutineScope()
-    val activeLocationId by exploreRepository.activeLocationIdFlow.collectAsState()
-    val unlockedDestinations by exploreRepository.unlockedDestinationsFlow.collectAsState()
-    val routeDestinations by exploreRepository.selectedRouteDestinationsFlow.collectAsState()
+
+    val activeLocationId by
+    exploreRepository.activeLocationIdFlow.collectAsState()
+
+    val unlockedDestinations by
+    exploreRepository.unlockedDestinationsFlow.collectAsState()
+
+    val routeDestinations by
+    exploreRepository.selectedRouteDestinationsFlow.collectAsState()
 
     var selectedLocationFilter by remember(activeLocationId) {
-        mutableStateOf(activeLocationId ?: MockLocations.kallio.locationId)
+        mutableStateOf(
+            activeLocationId ?: MockLocations.kallio.locationId
+        )
     }
-    var selectedDestinationForSheet by remember { mutableStateOf<Destination?>(null) }
-    var unlockErrorMessage by remember { mutableStateOf<String?>(null) }
-    var newlyEarnedAchievement by remember { mutableStateOf<UserAchievement?>(null) }
+
+    var selectedDestination by remember {
+        mutableStateOf<Destination?>(null)
+    }
+
+    var unlockErrorMessage by remember {
+        mutableStateOf<String?>(null)
+    }
+
+    var newlyEarnedAchievement by remember {
+        mutableStateOf<UserAchievement?>(null)
+    }
 
     val focusedLocation = remember(selectedLocationFilter) {
-        MockLocations.allLocations.find { it.locationId == selectedLocationFilter }
-            ?: MockLocations.kallio
+        MockLocations.allLocations.find {
+            it.locationId == selectedLocationFilter
+        } ?: MockLocations.kallio
     }
 
-    fun isDestUnlocked(destId: String): Boolean =
-        unlockedDestinations.any { it.destinationId == destId }
+    fun isDestUnlocked(destinationId: String): Boolean {
+        return unlockedDestinations.any {
+            it.destinationId == destinationId
+        }
+    }
 
-    // Calculate total route distance (PBI-24): User -> Stop 1 -> Stop 2 -> ...
+    // Calculate route distance: User -> Stop 1 -> Stop 2...
     val totalRouteDistanceText = remember(routeDestinations) {
-        if (routeDestinations.isEmpty()) {
-            "0 m"
+        var totalMeters = 0.0
+
+        var previousLatitude = MockLocations.MOCK_USER_LATITUDE
+        var previousLongitude = MockLocations.MOCK_USER_LONGITUDE
+
+        routeDestinations.forEach { destination ->
+            totalMeters += DistanceCalculator.distanceInMeters(
+                previousLatitude,
+                previousLongitude,
+                destination.latitude,
+                destination.longitude
+            )
+
+            previousLatitude = destination.latitude
+            previousLongitude = destination.longitude
+        }
+
+        if (totalMeters < 1000) {
+            "${totalMeters.toInt()} m"
         } else {
-            var totalMeters = 0.0
-            var prevLat = MockLocations.MOCK_USER_LATITUDE
-            var prevLng = MockLocations.MOCK_USER_LONGITUDE
-            routeDestinations.forEach { stop ->
-                totalMeters += DistanceCalculator.distanceInMeters(
-                    prevLat,
-                    prevLng,
-                    stop.latitude,
-                    stop.longitude
-                )
-                prevLat = stop.latitude
-                prevLng = stop.longitude
-            }
-            if (totalMeters < 1000.0) {
-                "${totalMeters.toInt()} m"
-            } else {
-                String.format(java.util.Locale.US, "%.2f km", totalMeters / 1000.0)
-            }
+            String.format(
+                java.util.Locale.US,
+                "%.2f km",
+                totalMeters / 1000
+            )
         }
     }
 
@@ -127,37 +117,46 @@ fun MapScreen(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // Location Filter Chips
+
+        // LOCATION FILTER
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 Text(
                     text = "Helsinki Exploration Map & Route Planner",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
+
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    MockLocations.allLocations.forEach { loc ->
+                    MockLocations.allLocations.forEach { location ->
                         FilterChip(
-                            selected = selectedLocationFilter == loc.locationId,
-                            onClick = { selectedLocationFilter = loc.locationId },
-                            label = { Text(loc.name) }
+                            selected = selectedLocationFilter == location.locationId,
+                            onClick = {
+                                selectedLocationFilter = location.locationId
+                            },
+                            label = {
+                                Text(location.name)
+                            }
                         )
                     }
                 }
             }
         }
 
-        // Interactive Visual Map Canvas (PBI-20, PBI-21, PBI-23, PBI-25)
+        // MAP CANVAS
         item {
             Card(
+                modifier = Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.large,
-                elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
-                modifier = Modifier.fillMaxWidth()
+                elevation = CardDefaults.cardElevation(3.dp)
             ) {
                 Column {
+
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -167,12 +166,15 @@ fun MapScreen(
                     ) {
                         val destinations = focusedLocation.destinations
 
-                        Canvas(modifier = Modifier.fillMaxSize()) {
+                        Canvas(
+                            modifier = Modifier.fillMaxSize()
+                        ) {
                             val w = size.width
                             val h = size.height
 
-                            // Subtle map grid lines
+                            // Map grid
                             val gridStep = 45.dp.toPx()
+
                             var x = gridStep
                             while (x < w) {
                                 drawLine(
@@ -183,6 +185,7 @@ fun MapScreen(
                                 )
                                 x += gridStep
                             }
+
                             var y = gridStep
                             while (y < h) {
                                 drawLine(
@@ -194,75 +197,98 @@ fun MapScreen(
                                 y += gridStep
                             }
 
-                            // User current location marker at bottom-left
-                            val userPos = Offset(w * 0.16f, h * 0.80f)
+                            // User marker
+                            val userPosition = Offset(
+                                w * 0.16f,
+                                h * 0.80f
+                            )
 
-                            // Fixed visual positions for the destinations inside the map box
-                            val markerOffsets = destinations.mapIndexed { idx, _ ->
-                                when (idx % 3) {
+                            // Destination positions
+                            val markerOffsets = destinations.mapIndexed { index, _ ->
+                                when (index % 3) {
                                     0 -> Offset(w * 0.42f, h * 0.35f)
                                     1 -> Offset(w * 0.72f, h * 0.28f)
                                     else -> Offset(w * 0.65f, h * 0.70f)
                                 }
                             }
 
-                            // Draw active route polyline connecting User -> Selected Route Destinations (PBI-23)
+                            // Draw route
                             if (routeDestinations.isNotEmpty()) {
-                                var prevOffset = userPos
+                                var previousPosition = userPosition
+
                                 routeDestinations.forEach { stop ->
-                                    val idx = destinations.indexOfFirst { it.destinationId == stop.destinationId }
-                                    val targetOffset = if (idx >= 0) {
-                                        markerOffsets[idx]
-                                    } else {
-                                        Offset(w * 0.82f, h * 0.50f)
+                                    val index = destinations.indexOfFirst {
+                                        it.destinationId == stop.destinationId
                                     }
+
+                                    val targetPosition =
+                                        if (index >= 0) {
+                                            markerOffsets[index]
+                                        } else {
+                                            Offset(w * 0.82f, h * 0.50f)
+                                        }
+
                                     drawLine(
                                         color = secondaryColor,
-                                        start = prevOffset,
-                                        end = targetOffset,
+                                        start = previousPosition,
+                                        end = targetPosition,
                                         strokeWidth = 8f,
-                                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(18f, 10f), 0f)
+                                        pathEffect = PathEffect.dashPathEffect(
+                                            floatArrayOf(18f, 10f),
+                                            0f
+                                        )
                                     )
-                                    prevOffset = targetOffset
+
+                                    previousPosition = targetPosition
                                 }
                             }
 
-                            // Draw User Location pulse
+                            // User location pulse
                             drawCircle(
                                 color = Color(0xFF42A5F5).copy(alpha = 0.3f),
                                 radius = 30f,
-                                center = userPos
+                                center = userPosition
                             )
+
                             drawCircle(
                                 color = Color(0xFF42A5F5),
                                 radius = 14f,
-                                center = userPos
+                                center = userPosition
                             )
 
-                            // Draw Destination Markers (green/teal if unlocked, amber if in route, gray if locked)
-                            destinations.forEachIndexed { idx, dest ->
-                                val pos = markerOffsets[idx]
-                                val unlocked = isDestUnlocked(dest.destinationId)
-                                val inRoute = routeDestinations.any { it.destinationId == dest.destinationId }
+                            // Destination markers
+                            destinations.forEachIndexed { index, destination ->
+                                val position = markerOffsets[index]
+
+                                val unlocked = isDestUnlocked(
+                                    destination.destinationId
+                                )
+
+                                val inRoute = routeDestinations.any {
+                                    it.destinationId == destination.destinationId
+                                }
+
                                 val markerColor = when {
                                     unlocked -> primaryColor
                                     inRoute -> secondaryColor
                                     else -> lockedColor
                                 }
+
                                 drawCircle(
                                     color = Color.White,
                                     radius = 20f,
-                                    center = pos
+                                    center = position
                                 )
+
                                 drawCircle(
                                     color = markerColor,
                                     radius = 15f,
-                                    center = pos
+                                    center = position
                                 )
                             }
                         }
 
-                        // Map Legend Overlay
+                        // MAP LEGEND
                         Surface(
                             color = Color.Black.copy(alpha = 0.6f),
                             shape = MaterialTheme.shapes.small,
@@ -271,9 +297,12 @@ fun MapScreen(
                                 .padding(10.dp)
                         ) {
                             Row(
+                                modifier = Modifier.padding(
+                                    horizontal = 10.dp,
+                                    vertical = 6.dp
+                                ),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.MyLocation,
@@ -281,16 +310,17 @@ fun MapScreen(
                                     tint = Color(0xFF42A5F5),
                                     modifier = Modifier.size(16.dp)
                                 )
+
                                 Text(
                                     text = "You (Helsinki) • Area: ${focusedLocation.name}",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = Color.White
+                                    color = Color.White,
+                                    style = MaterialTheme.typography.labelSmall
                                 )
                             }
                         }
                     }
 
-                    // Route Distance Summary Bar (PBI-22, PBI-24)
+                    // ROUTE DISTANCE
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -307,12 +337,14 @@ fun MapScreen(
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary
                             )
+
                             Column {
                                 Text(
                                     text = "Active Route (${routeDestinations.size} stops)",
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.Bold
                                 )
+
                                 Text(
                                     text = "Total Route Distance: $totalRouteDistanceText",
                                     style = MaterialTheme.typography.bodySmall,
@@ -322,7 +354,11 @@ fun MapScreen(
                         }
 
                         if (routeDestinations.isNotEmpty()) {
-                            OutlinedButton(onClick = { MockSessionState.clearRoute() }) {
+                            OutlinedButton(
+                                onClick = {
+                                    MockSessionState.clearRoute()
+                                }
+                            ) {
                                 Icon(
                                     imageVector = Icons.Default.ClearAll,
                                     contentDescription = null,
@@ -336,19 +372,31 @@ fun MapScreen(
             }
         }
 
-        // Destination Markers & Route Builder List (Steps 19-20 of Travelock.pdf)
+        // DESTINATIONS TITLE
         item {
             Text(
-                text = "Destinations in ${focusedLocation.name} — Add to Route or Tap to Unlock",
+                text = "Destinations in ${focusedLocation.name}",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
         }
 
-        items(focusedLocation.destinations, key = { it.destinationId }) { dest ->
-            val unlocked = isDestUnlocked(dest.destinationId)
-            val inRoute = routeDestinations.any { it.destinationId == dest.destinationId }
-            val distText = exploreRepository.formatDistanceFromUser(dest.latitude, dest.longitude)
+        // DESTINATION LIST
+        items(
+            items = focusedLocation.destinations,
+            key = { it.destinationId }
+        ) { destination ->
+
+            val unlocked = isDestUnlocked(destination.destinationId)
+
+            val inRoute = routeDestinations.any {
+                it.destinationId == destination.destinationId
+            }
+
+            val distanceText = exploreRepository.formatDistanceFromUser(
+                destination.latitude,
+                destination.longitude
+            )
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -356,38 +404,41 @@ fun MapScreen(
                     containerColor = MaterialTheme.colorScheme.surface
                 )
             ) {
-                Column(modifier = Modifier.padding(14.dp)) {
+                Column(
+                    modifier = Modifier.padding(14.dp)
+                ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(
-                                imageVector = if (unlocked) Icons.Default.CheckCircle else Icons.Default.Lock,
-                                contentDescription = null,
-                                tint = if (unlocked) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                }
-                            )
-                            Column {
-                                Text(
-                                    text = dest.name,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = "${if (unlocked) "Unlocked" else "Locked"} • $distText from you",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                        Icon(
+                            imageVector = if (unlocked) {
+                                Icons.Default.CheckCircle
+                            } else {
+                                Icons.Default.Lock
+                            },
+                            contentDescription = null,
+                            tint = if (unlocked) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
                             }
+                        )
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        Column {
+                            Text(
+                                text = destination.name,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+
+                            Text(
+                                text = "${if (unlocked) "Unlocked" else "Locked"} • $distanceText from you",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
 
@@ -398,7 +449,9 @@ fun MapScreen(
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         OutlinedButton(
-                            onClick = { MockSessionState.toggleRouteDestination(dest) },
+                            onClick = {
+                                MockSessionState.toggleRouteDestination(destination)
+                            },
                             modifier = Modifier.weight(1f)
                         ) {
                             Icon(
@@ -406,17 +459,24 @@ fun MapScreen(
                                 contentDescription = null,
                                 modifier = Modifier.padding(end = 6.dp)
                             )
-                            Text(if (inRoute) "Remove from Route" else "Add to Route")
+
+                            Text(
+                                if (inRoute) "Remove from Route"
+                                else "Add to Route"
+                            )
                         }
 
                         Button(
                             onClick = {
                                 unlockErrorMessage = null
-                                selectedDestinationForSheet = dest
+                                selectedDestination = destination
                             },
                             modifier = Modifier.weight(1f)
                         ) {
-                            Text(if (unlocked) "View Details" else "Arrive & Unlock")
+                            Text(
+                                if (unlocked) "View Details"
+                                else "Arrive & Unlock"
+                            )
                         }
                     }
                 }
@@ -424,43 +484,77 @@ fun MapScreen(
         }
     }
 
-    selectedDestinationForSheet?.let { dest ->
-        DestinationCardExpanded(
-            destination = dest,
-            isUnlocked = isDestUnlocked(dest.destinationId),
-            distanceText = exploreRepository.formatDistanceFromUser(dest.latitude, dest.longitude),
-            errorMessage = unlockErrorMessage,
-            onUnlockWithQr = { scannedCode ->
+    // EXTENDED DESTINATION BOTTOM SHEET
+    selectedDestination?.let { destination ->
+
+        ExtendedDestinationCard(
+            destination = destination,
+            isLocked = !isDestUnlocked(destination.destinationId),
+
+            onBack = {
+                selectedDestination = null
+            },
+
+            // Uses the destination's mock QR code.
+            // Replace this with a real QR scanner result when integrated.
+            onUnlockQr = {
                 scope.launch {
-                    exploreRepository.unlockDestinationWithQr(dest, scannedCode)
-                        .onSuccess { (_, ach) ->
-                            selectedDestinationForSheet = null
-                            if (ach != null) newlyEarnedAchievement = ach
+                    exploreRepository.unlockDestinationWithQr(
+                        destination,
+                        destination.qrCode
+                    ).onSuccess { (_, achievement) ->
+
+                        selectedDestination = null
+
+                        if (achievement != null) {
+                            newlyEarnedAchievement = achievement
                         }
-                        .onFailure { err ->
-                            unlockErrorMessage = err.message
-                        }
+
+                    }.onFailure { error ->
+                        unlockErrorMessage = error.message
+                    }
                 }
             },
-            onUnlockWithPhoto = { caption ->
-                scope.launch {
-                    exploreRepository.unlockDestinationWithPhoto(dest, caption)
-                        .onSuccess { (_, ach) ->
-                            selectedDestinationForSheet = null
-                            if (ach != null) newlyEarnedAchievement = ach
-                        }
-                        .onFailure { err ->
-                            unlockErrorMessage = err.message
-                        }
-                }
-            },
-            onDismiss = { selectedDestinationForSheet = null }
+
+            // Camera integration is not implemented by the supplied component.
+            onUnlockCamera = {
+                unlockErrorMessage =
+                    "Camera verification is not connected yet."
+            }
         )
     }
 
-    newlyEarnedAchievement?.let { ach ->
+    // ERROR DIALOG
+    unlockErrorMessage?.let { message ->
         AlertDialog(
-            onDismissRequest = { newlyEarnedAchievement = null },
+            onDismissRequest = {
+                unlockErrorMessage = null
+            },
+            title = {
+                Text("Unlock information")
+            },
+            text = {
+                Text(message)
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        unlockErrorMessage = null
+                    }
+                ) {
+                    Text("OK")
+                }
+            }
+        )
+    }
+
+    // ACHIEVEMENT DIALOG
+    newlyEarnedAchievement?.let { achievement ->
+
+        AlertDialog(
+            onDismissRequest = {
+                newlyEarnedAchievement = null
+            },
             icon = {
                 Icon(
                     imageVector = Icons.Default.EmojiEvents,
@@ -468,19 +562,25 @@ fun MapScreen(
                     tint = MaterialTheme.colorScheme.secondary
                 )
             },
-            title = { Text("${ach.location.name} Explored! 🏆") },
+            title = {
+                Text("${achievement.location.name} Explored! 🏆")
+            },
             text = {
                 Text(
-                    "You unlocked every destination in ${ach.location.name}! " +
-                        "The '${ach.location.name} Explorer' achievement has been saved to your profile."
+                    "You unlocked every destination in ${achievement.location.name}! " +
+                            "The '${achievement.location.name} Explorer' achievement " +
+                            "has been saved to your profile."
                 )
             },
             confirmButton = {
-                TextButton(onClick = { newlyEarnedAchievement = null }) {
+                TextButton(
+                    onClick = {
+                        newlyEarnedAchievement = null
+                    }
+                ) {
                     Text("Great!")
                 }
             }
         )
     }
 }
-

@@ -1,18 +1,13 @@
+
 package com.example.travelock.data.mock
 
 import com.example.travelock.data.model.Destination
 import com.example.travelock.data.model.Location
 
-/**
- * Realistic Helsinki mock Locations and nested Destinations based on Travelock.pdf and Objects.pdf.
- *
- * Domain terminology:
- * - Location: Broader district/area in Helsinki (e.g., Kallio, Myllypuro, Suomenlinna, Kamppi).
- * - Destination: Specific places inside a Location that users visit to unlock.
- */
 object MockLocations {
 
-    // ── 1. Kallio Destinations ──────────────────────────────────────────────────
+    // ─────────────── KALLIO DESTINATIONS ───────────────
+
     val kallioLibrary = Destination(
         destinationId = "dest-kallio-library",
         locationId = "loc-kallio",
@@ -21,7 +16,7 @@ object MockLocations {
         discount = 10f,
         latitude = 60.1842,
         longitude = 24.9539,
-        image = "kallio_library",
+        image = "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSNFexzzjyec5kNRg8Z3oATfNwe1Qch9ljPdSPlS7mFFg&s=10",
         qrCode = "TRAVELOCK-QR-KALLIO-LIB-001"
     )
 
@@ -29,11 +24,11 @@ object MockLocations {
         destinationId = "dest-kallio-church",
         locationId = "loc-kallio",
         name = "Kallio Church",
-        description = "Iconic granite National Romantic church designed by Lars Sonck (1912), crowning the Kallio hill with music composed by Jean Sibelius.",
+        description = "Iconic granite National Romantic church designed by Lars Sonck in 1912.",
         discount = 0f,
         latitude = 60.1843,
         longitude = 24.9493,
-        image = "kallio_church",
+        image = "https://www.myhelsinki.fi/wp-content/uploads/2024/09/2d784887-02dd-4435-a170-2ea98cbf96d9-853x1280.jpg",
         qrCode = "TRAVELOCK-QR-KALLIO-CHURCH-002"
     )
 
@@ -41,24 +36,25 @@ object MockLocations {
         destinationId = "dest-karhupuisto",
         locationId = "loc-kallio",
         name = "Bear Park (Karhupuisto)",
-        description = "Beloved triangular park named after its 1931 red-granite bear statue, surrounded by indie cafés, vintage shops, and summer flower stalls.",
+        description = "Beloved triangular park named after its red-granite bear statue, surrounded by independent cafés and vintage shops.",
         discount = 15f,
         latitude = 60.1840,
         longitude = 24.9530,
-        image = "karhupuisto",
+        image = "https://static.stadissa.fi/places/8a0e5f37c85c66c8eb3107ad6240ec76.JPG",
         qrCode = "TRAVELOCK-QR-KALLIO-BEAR-003"
     )
 
-    // ── 2. Myllypuro Destinations ───────────────────────────────────────────────
+    // ─────────────── MYLLYPURO DESTINATIONS ───────────────
+
     val metropoliaMyllypuro = Destination(
         destinationId = "dest-metropolia-myllypuro",
         locationId = "loc-myllypuro",
         name = "Myllypuro Metropolia University",
-        description = "Modern Campus of Builders at Metropolia University of Applied Sciences. Features rooftop terraces, smart labs, and vibrant student life.",
+        description = "Modern Metropolia University campus featuring smart labs, study spaces and vibrant student life.",
         discount = 20f,
         latitude = 60.2236,
         longitude = 25.0781,
-        image = "metropolia_campus",
+        image = "https://www.metropolia.fi/sites/default/files/images/Kampukset/myllypuron-kampus-ilmakuva.jpg",
         qrCode = "TRAVELOCK-QR-MYLLYPURO-METRO-001"
     )
 
@@ -66,11 +62,11 @@ object MockLocations {
         destinationId = "dest-myllypuro-pool",
         locationId = "loc-myllypuro",
         name = "Myllypuro Swimming Pool & Sports Park",
-        description = "Popular East Helsinki recreation hub offering indoor fitness facilities, floorball arenas, and scenic outdoor jogging trails.",
+        description = "Popular East Helsinki recreation hub offering sports facilities, swimming and outdoor activities.",
         discount = 15f,
         latitude = 60.2261,
         longitude = 25.0725,
-        image = "myllypuro_pool",
+        image = "https://stplattaprod.blob.core.windows.net/helfikuvaprod/styles/1_5_927w_618h/azure/testi_yrjonkadun_uimahalli_2021_kuva_maarit_hohteri_18.jpg.webp?h=81e9ca55&itok=14jzvFe2",
         qrCode = "TRAVELOCK-QR-MYLLYPURO-POOL-002"
     )
 
@@ -78,15 +74,16 @@ object MockLocations {
         destinationId = "dest-myllypuro-tower",
         locationId = "loc-myllypuro",
         name = "Myllypuro Old Forest Trail",
-        description = "Peaceful wooded ridge trail with glacial rock formations and WWI heritage trenches right next to the Myllypuro campus.",
+        description = "Peaceful wooded area with natural rock formations and historical trenches near the Myllypuro campus.",
         discount = 0f,
         latitude = 60.2215,
         longitude = 25.0810,
-        image = "myllypuro_trail",
+        image = "https://riveri68.blogaaja.fi/files/2023/03/etualalla-vesitorni-1024x702.jpg",
         qrCode = "TRAVELOCK-QR-MYLLYPURO-TRAIL-003"
     )
 
-    // ── 3. Suomenlinna Destinations ─────────────────────────────────────────────
+    // ─────────────── SUOMENLINNA DESTINATIONS ───────────────
+
     val suomenlinnaFortress = Destination(
         destinationId = "dest-suomenlinna-fortress",
         locationId = "loc-suomenlinna",
@@ -95,7 +92,7 @@ object MockLocations {
         discount = 10f,
         latitude = 60.1454,
         longitude = 24.9881,
-        image = "suomenlinna_fortress",
+        image = "https://suomenlinna.fi/wp-content/uploads/2025/04/23A08-108k.jpg",
         qrCode = "TRAVELOCK-QR-SUOMENLINNA-FORT-001"
     )
 
@@ -103,11 +100,11 @@ object MockLocations {
         destinationId = "dest-kings-gate",
         locationId = "loc-suomenlinna",
         name = "King's Gate (Kuninkaanportti)",
-        description = "The ceremonial entrance to Suomenlinna built in 1753–1754 where King Adolf Frederick of Sweden anchored his ship.",
+        description = "The ceremonial entrance to Suomenlinna built in 1753–1754.",
         discount = 0f,
         latitude = 60.1398,
         longitude = 24.9899,
-        image = "kings_gate",
+        image = "https://historia.hel.fi/sites/default/files/styles/large/public/hkm.HKMS000005_000002l7-0-master.jpg",
         qrCode = "TRAVELOCK-QR-SUOMENLINNA-GATE-002"
     )
 
@@ -115,24 +112,25 @@ object MockLocations {
         destinationId = "dest-suomenlinna-church",
         locationId = "loc-suomenlinna",
         name = "Suomenlinna Church & Lighthouse",
-        description = "Built in 1854, its steeple doubles as a functioning maritime and air traffic lighthouse blinking the Morse code letter 'H' for Helsinki.",
+        description = "Historic church built in 1854 whose steeple also functions as a maritime and air traffic lighthouse.",
         discount = 5f,
         latitude = 60.1478,
         longitude = 24.9862,
-        image = "suomenlinna_church",
+        image = "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTShDmIUlGJFjK48EHOc1JPGTJ_RvKS6g6r3PdFgejdfWuWMgveR8_ZTb8&s=10",
         qrCode = "TRAVELOCK-QR-SUOMENLINNA-CHURCH-003"
     )
 
-    // ── 4. Kluuvi & Central Helsinki Destinations ───────────────────────────────
+    // ─────────────── KLUVVI DESTINATIONS ───────────────
+
     val oodiLibrary = Destination(
         destinationId = "dest-oodi",
         locationId = "loc-kluuvi",
         name = "Oodi Central Library",
-        description = "Helsinki's architectural wooden-and-glass living room across from Parliament House, offering 3D printers, studios, and panoramic rooftop views.",
+        description = "Helsinki's modern central library featuring creative spaces, 3D printers, studios and beautiful architecture.",
         discount = 10f,
         latitude = 60.1741,
         longitude = 24.9382,
-        image = "oodi_library",
+        image = "https://oodihelsinki.fi/wp-content/uploads/2018/12/Oodi_verkkosivut_hero-kuvat_1920x1080_TuomasUusheimo_07.jpg",
         qrCode = "TRAVELOCK-QR-KLUUVI-OODI-001"
     )
 
@@ -140,61 +138,85 @@ object MockLocations {
         destinationId = "dest-cathedral",
         locationId = "loc-kluuvi",
         name = "Helsinki Cathedral & Senate Square",
-        description = "Neoclassical white cathedral designed by Carl Ludvig Engel overlooking the historic Senate Square.",
+        description = "Neoclassical white cathedral designed by Carl Ludvig Engel overlooking historic Senate Square.",
         discount = 0f,
         latitude = 60.1704,
         longitude = 24.9522,
-        image = "helsinki_cathedral",
+        image = "https://helsingintuomiokirkko.fi/material/images/wt6eYOfdf/tuomiokirkko_suoraanedesta_kirkkosivuille_hemmila.jpg",
         qrCode = "TRAVELOCK-QR-KLUUVI-CATH-002"
     )
 
-    // ── Locations List ──────────────────────────────────────────────────────────
+    // ─────────────── LOCATIONS ───────────────
+
     val kallio = Location(
         locationId = "loc-kallio",
         name = "Kallio",
-        description = "Helsinki's lively bohemian district known for historic granite architecture, cozy parks, community libraries, and vibrant street culture.",
+        description = "Helsinki's lively bohemian district known for historic architecture, cozy parks, community libraries and vibrant street culture.",
         latitude = 60.1841,
         longitude = 24.9514,
-        image = "loc_kallio",
-        destinations = listOf(kallioLibrary, kallioChurch, karhupuisto)
+        image = "https://www.myhelsinki.fi/wp-content/uploads/2024/09/2d784887-02dd-4435-a170-2ea98cbf96d9-853x1280.jpg",
+        destinations = listOf(
+            kallioLibrary,
+            kallioChurch,
+            karhupuisto
+        )
     )
 
     val myllypuro = Location(
         locationId = "loc-myllypuro",
         name = "Myllypuro",
-        description = "Dynamic East Helsinki district home to the modern Metropolia University campus, sports parks, and scenic forest trails.",
+        description = "Dynamic East Helsinki district home to the modern Metropolia University campus, sports parks and forest trails.",
         latitude = 60.2236,
         longitude = 25.0781,
-        image = "loc_myllypuro",
-        destinations = listOf(metropoliaMyllypuro, myllypuroSwimmingPool, myllypuroWaterTower)
+        image = "https://riveri68.blogaaja.fi/files/2023/03/etualalla-vesitorni-1024x702.jpg",
+        destinations = listOf(
+            metropoliaMyllypuro,
+            myllypuroSwimmingPool,
+            myllypuroWaterTower
+        )
     )
 
     val suomenlinna = Location(
         locationId = "loc-suomenlinna",
         name = "Suomenlinna",
-        description = "UNESCO World Heritage sea fortress archipelago just a 15-minute ferry ride from Helsinki Market Square.",
+        description = "UNESCO World Heritage sea fortress archipelago just a short ferry ride from Helsinki Market Square.",
         latitude = 60.1454,
         longitude = 24.9881,
-        image = "loc_suomenlinna",
-        destinations = listOf(suomenlinnaFortress, kingsGate, suomenlinnaChurch)
+        image = "https://historia.hel.fi/sites/default/files/styles/large/public/hkm.HKMS000005_000002l7-0-master.jpg",
+        destinations = listOf(
+            suomenlinnaFortress,
+            kingsGate,
+            suomenlinnaChurch
+        )
     )
 
     val kluuvi = Location(
         locationId = "loc-kluuvi",
         name = "Kluuvi & City Center",
-        description = "The bustling heart of Helsinki featuring iconic neoclassical landmarks, central parks, and contemporary Finnish architecture.",
+        description = "The bustling heart of Helsinki featuring iconic neoclassical landmarks, central parks and contemporary Finnish architecture.",
         latitude = 60.1720,
         longitude = 24.9450,
-        image = "loc_kluuvi",
-        destinations = listOf(oodiLibrary, helsinkiCathedral)
+        image = "https://oodihelsinki.fi/wp-content/uploads/2018/12/Oodi_verkkosivut_hero-kuvat_1920x1080_TuomasUusheimo_07.jpg",
+        destinations = listOf(
+            oodiLibrary,
+            helsinkiCathedral
+        )
     )
 
-    val allLocations: List<Location> = listOf(kallio, myllypuro, suomenlinna, kluuvi)
+    // ─────────────── ALL DATA ───────────────
 
-    val allDestinations: List<Destination> = allLocations.flatMap { it.destinations }
+    val allLocations: List<Location> = listOf(
+        kallio,
+        myllypuro,
+        suomenlinna,
+        kluuvi
+    )
 
-    // Default simulated user coordinates in central Helsinki (near Rautatientori / Kaisaniemi)
+    val allDestinations: List<Destination> =
+        allLocations.flatMap { it.destinations }
+
+    // ─────────────── DEFAULT SIMULATED USER COORDINATES ───────────────
+
     const val MOCK_USER_LATITUDE = 60.1756
     const val MOCK_USER_LONGITUDE = 24.9442
 }
-
