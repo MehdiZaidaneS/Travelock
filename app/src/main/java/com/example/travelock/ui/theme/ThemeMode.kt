@@ -1,4 +1,4 @@
-package com.example.travelock.data.model
+package com.example.travelock.ui.theme
 
 /**
  * Represents the three theme modes the user can choose from.

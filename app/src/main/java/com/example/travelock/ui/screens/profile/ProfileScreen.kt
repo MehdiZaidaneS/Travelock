@@ -34,8 +34,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.travelock.data.mock.MockLocations
 import com.example.travelock.data.mock.MockUsers
-import com.example.travelock.data.model.ThemeMode
-import com.example.travelock.data.repository.UserRepository
+import com.example.travelock.ui.theme.ThemeMode
+import com.example.travelock.data.mock.repository.UserRepository
 import com.example.travelock.ui.components.AchievementBadgeCard
 import com.example.travelock.ui.components.ThemeSwitcher
 import com.example.travelock.ui.components.UserAvatarCircle

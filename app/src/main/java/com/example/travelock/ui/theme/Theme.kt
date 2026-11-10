@@ -11,7 +11,6 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
-import com.example.travelock.data.model.ThemeMode
 
 private val DarkColorScheme = darkColorScheme(
     primary = TravelockTealLight,

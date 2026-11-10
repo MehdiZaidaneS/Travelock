@@ -25,7 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.travelock.data.mock.MockUsers
-import com.example.travelock.data.repository.UserRepository
+import com.example.travelock.data.mock.repository.UserRepository
 import com.example.travelock.ui.components.UserAvatarCircle
 import kotlinx.coroutines.launch
 

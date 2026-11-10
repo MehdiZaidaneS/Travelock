@@ -20,8 +20,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.travelock.data.model.Notification
-import com.example.travelock.data.repository.NotificationRepository
-import com.example.travelock.data.repository.SocialRepository
+import com.example.travelock.data.mock.repository.NotificationRepository
+import com.example.travelock.data.mock.repository.SocialRepository
 import com.example.travelock.ui.components.NotificationItemCard
 import kotlinx.coroutines.launch
 

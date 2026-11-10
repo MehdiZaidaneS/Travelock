@@ -1,4 +1,4 @@
-package com.example.travelock.data.repository
+package com.example.travelock.data.mock.repository
 
 import com.example.travelock.data.mock.MockSessionState
 import com.example.travelock.data.mock.MockUsers

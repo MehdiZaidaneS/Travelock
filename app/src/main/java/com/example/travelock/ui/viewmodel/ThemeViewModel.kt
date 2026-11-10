@@ -3,7 +3,7 @@ package com.example.travelock.ui.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.example.travelock.data.model.ThemeMode
+import com.example.travelock.ui.theme.ThemeMode
 import com.example.travelock.util.DataStoreManager
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow

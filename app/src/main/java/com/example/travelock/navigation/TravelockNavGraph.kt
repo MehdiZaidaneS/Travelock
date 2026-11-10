@@ -15,8 +15,8 @@ import androidx.compose.ui.Modifier
 import com.example.travelock.data.mock.MockLocations
 import com.example.travelock.data.mock.MockSessionState
 import com.example.travelock.data.mock.MockUsers
-import com.example.travelock.data.model.ThemeMode
-import com.example.travelock.data.repository.AuthRepository
+import com.example.travelock.ui.theme.ThemeMode
+import com.example.travelock.data.mock.repository.AuthRepository
 import com.example.travelock.ui.auth.LandingScreen
 import com.example.travelock.ui.auth.LoginScreen
 import com.example.travelock.ui.auth.RegisterScreen

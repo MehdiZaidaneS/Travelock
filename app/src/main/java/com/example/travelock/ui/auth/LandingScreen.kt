@@ -11,7 +11,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.travelock.data.model.ThemeMode
+import com.example.travelock.ui.theme.ThemeMode
 import com.example.travelock.ui.components.ThemeSwitcher
 import com.example.travelock.ui.theme.LocalOnThemeModeChange
 import com.example.travelock.ui.theme.LocalThemeMode

@@ -36,7 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.travelock.data.mock.MockUsers
 import com.example.travelock.data.model.User
-import com.example.travelock.data.repository.SocialRepository
+import com.example.travelock.data.mock.repository.SocialRepository
 import com.example.travelock.ui.components.PostCard
 import com.example.travelock.ui.components.TravelockSearchBar
 import com.example.travelock.ui.components.UserAvatarCircle

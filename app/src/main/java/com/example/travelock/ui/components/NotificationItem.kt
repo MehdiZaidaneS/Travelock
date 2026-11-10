@@ -27,7 +27,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.travelock.data.mock.MockUsers
-import com.example.travelock.data.model.FriendRequest
+import com.example.travelock.data.mock.model.FriendRequest
 import com.example.travelock.data.model.Notification
 
 /**

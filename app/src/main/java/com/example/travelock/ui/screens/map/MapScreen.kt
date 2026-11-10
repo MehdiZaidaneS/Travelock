@@ -28,7 +28,7 @@ import com.example.travelock.data.mock.MockLocations
 import com.example.travelock.data.mock.MockSessionState
 import com.example.travelock.data.model.Destination
 import com.example.travelock.data.model.UserAchievement
-import com.example.travelock.data.repository.ExploreRepository
+import com.example.travelock.data.mock.repository.ExploreRepository
 import com.example.travelock.ui.components.ExtendedDestinationCard
 import com.example.travelock.util.DistanceCalculator
 import kotlinx.coroutines.launch

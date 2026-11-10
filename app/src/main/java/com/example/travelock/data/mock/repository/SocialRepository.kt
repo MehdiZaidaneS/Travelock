@@ -1,9 +1,9 @@
-package com.example.travelock.data.repository
+package com.example.travelock.data.mock.repository
 
 import com.example.travelock.data.mock.MockSessionState
 import com.example.travelock.data.mock.MockUsers
 import com.example.travelock.data.model.Destination
-import com.example.travelock.data.model.FriendRequest
+import com.example.travelock.data.mock.model.FriendRequest
 import com.example.travelock.data.model.Post
 import com.example.travelock.data.model.User
 import kotlinx.coroutines.flow.StateFlow

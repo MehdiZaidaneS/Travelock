@@ -11,7 +11,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import com.example.travelock.data.model.ThemeMode
+import com.example.travelock.ui.theme.ThemeMode
 
 /**
  * Reusable Material 3 segmented button bar allowing the user to manually switch

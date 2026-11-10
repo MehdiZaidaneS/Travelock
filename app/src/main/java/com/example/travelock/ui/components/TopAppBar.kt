@@ -33,7 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.travelock.data.model.ThemeMode
+import com.example.travelock.ui.theme.ThemeMode
 
 /**
  * Top App Bar for authenticated Travelock views.

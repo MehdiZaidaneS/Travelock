@@ -1,6 +1,6 @@
 package com.example.travelock.data.mock
 
-import com.example.travelock.data.model.FriendRequest
+import com.example.travelock.data.mock.model.FriendRequest
 import com.example.travelock.data.model.Notification
 import java.time.Instant
 

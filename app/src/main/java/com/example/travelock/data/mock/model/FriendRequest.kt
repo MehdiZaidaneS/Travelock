@@ -1,5 +1,6 @@
-package com.example.travelock.data.model
+package com.example.travelock.data.mock.model
 
+import com.example.travelock.data.model.InstantSerializer
 import java.time.Instant
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable

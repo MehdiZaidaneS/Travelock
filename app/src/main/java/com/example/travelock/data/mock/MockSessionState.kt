@@ -2,7 +2,7 @@ package com.example.travelock.data.mock
 
 import com.example.travelock.data.model.Comment
 import com.example.travelock.data.model.Destination
-import com.example.travelock.data.model.FriendRequest
+import com.example.travelock.data.mock.model.FriendRequest
 import com.example.travelock.data.model.Location
 import com.example.travelock.data.model.Notification
 import com.example.travelock.data.model.Post
