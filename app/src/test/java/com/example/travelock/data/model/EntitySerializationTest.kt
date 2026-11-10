@@ -13,6 +13,17 @@ class EntitySerializationTest {
     private val json = Json { ignoreUnknownKeys = true }
 
     @Test
+    fun friendTravelProfileDecodesEmptyHistoryAndMissingProfile() {
+        val payload = """{"profile":{"user_id":"friend","username":"friend","name":"Friend","profile_image":""},"achievements":[],"unlocks":[]}"""
+        val profile = json.decodeFromString<FriendTravelProfile>(payload)
+        assertEquals("friend", profile.profile.userId)
+        assertEquals(emptyList<UserAchievement>(), profile.achievements)
+        assertEquals(emptyList<UserUnlock>(), profile.unlocks)
+        assertEquals(profile, json.decodeFromString<FriendTravelProfile>(json.encodeToString(profile)))
+        assertNull(json.decodeFromString<FriendTravelProfile?>("null"))
+    }
+
+    @Test
     fun locationProgressDecodesLockedAndEarnedStates() {
         val base = """{"location_id":"l","location_name":"Helsinki","total_destinations":2,"verified_destinations":1,"is_complete":false,"is_earned":false,"achievement_name":"Explore Helsinki","achievement_description":"Verify every destination in Helsinki."}"""
         val locked = json.decodeFromString<LocationProgress>(base)

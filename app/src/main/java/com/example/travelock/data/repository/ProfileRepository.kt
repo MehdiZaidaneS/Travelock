@@ -1,6 +1,7 @@
 package com.example.travelock.data.repository
 
 import com.example.travelock.data.SupabaseProvider
+import com.example.travelock.data.model.FriendTravelProfile
 import com.example.travelock.data.model.Profile
 import com.example.travelock.data.model.ProfileSummary
 import io.github.jan.supabase.auth.auth
@@ -12,6 +13,20 @@ import kotlinx.serialization.json.put
 // Database errors are left for the caller to handle, such as a username already in use.
 class ProfileRepository {
     private val supabase = SupabaseProvider.client
+
+    // Only accepted friends can load this summary. Visit evidence stays private.
+    // Returns null when the friend has not created their profile yet.
+    suspend fun getFriendTravelProfile(userId: String): FriendTravelProfile? {
+        require(userId.isNotBlank()) { "User ID cannot be blank." }
+        supabase.auth.awaitInitialization()
+        checkNotNull(supabase.auth.currentUserOrNull()) {
+            "You must sign in before viewing a friend's travel history."
+        }
+        val result = supabase.postgrest.rpc("get_friend_travel_profile", buildJsonObject {
+            put("profile_user_id", userId)
+        })
+        return if (result.data.trim() == "null") null else result.decodeAs<FriendTravelProfile>()
+    }
 
     // The server searches basic profile fields and returns up to 20 other users.
     suspend fun searchProfiles(query: String): List<ProfileSummary> {
