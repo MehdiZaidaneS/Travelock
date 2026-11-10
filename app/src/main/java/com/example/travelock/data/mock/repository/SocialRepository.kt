@@ -68,7 +68,7 @@ class SocialRepository {
         // TODO: SUPABASE - Replace mock post creation with PostPhotoRepository + PostRepository:
         // val postId = UUID.randomUUID().toString()
         // val imagePath = PostPhotoRepository().uploadPostPhoto(postId, jpegBytes)
-        // return PostRepository().createPost(postId, destination.destinationId, imagePath, description)
+        // return PostRepository().createPost(postId, completedVisit.visitId, imagePath, description)
 
         return MockSessionState.addPost(destination, description)
     }

@@ -20,4 +20,7 @@ data class Post(
     val createdAt: Instant,
     val likes: List<User> = emptyList(),
     val comments: List<Comment> = emptyList(),
+    val visibility: PostVisibility = PostVisibility.FRIENDS,
+    @SerialName("visit_id")
+    val visitId: String? = null,
 )

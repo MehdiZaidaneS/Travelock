@@ -13,6 +13,20 @@ class EntitySerializationTest {
     private val json = Json { ignoreUnknownKeys = true }
 
     @Test
+    fun postDecodesVisibilityAndVisitWhileSupportingLegacyRows() {
+        val legacy = """{"post_id":"p","user_id":"u","destination_id":"d","image":"u/p/photo.jpg","image_description":"Visit","created_at":"2026-11-10T00:00:00Z"}"""
+        val oldPost = json.decodeFromString<Post>(legacy)
+        assertEquals(PostVisibility.FRIENDS, oldPost.visibility)
+        assertNull(oldPost.visitId)
+        val shared = json.decodeFromString<Post>(legacy.dropLast(1) + """, "visibility":"public", "visit_id":"visit-1"}""")
+        assertEquals(PostVisibility.PUBLIC, shared.visibility)
+        assertEquals("visit-1", shared.visitId)
+        assertEquals(shared, json.decodeFromString<Post>(json.encodeToString(shared)))
+        assertEquals("\"friends\"", json.encodeToString(PostVisibility.FRIENDS))
+        assertEquals("\"public\"", json.encodeToString(PostVisibility.PUBLIC))
+    }
+
+    @Test
     fun profileDiscoveryDecodesTableResultsWithoutFullProfileFields() {
         val results = json.decodeFromString<List<ProfileSummary>>(
             """[{"user_id":"user-b","username":"bob","name":"Bob","profile_image":""}]""",

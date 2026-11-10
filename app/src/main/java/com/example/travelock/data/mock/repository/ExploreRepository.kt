@@ -153,7 +153,7 @@ class ExploreRepository {
         // 2. UserUnlockRepository().completeVisit(visitId, photoPath, userLat, userLng)
         // 3. val postId = UUID.randomUUID().toString()
         //    val postPhotoPath = PostPhotoRepository().uploadPostPhoto(postId, jpegBytes)
-        //    PostRepository().createPost(postId, destination.destinationId, postPhotoPath, description)
+        //    PostRepository().createPost(postId, completedVisit.visitId, postPhotoPath, description)
 
         val earnedAchievement = MockSessionState.unlockDestination(destination)
         MockSessionState.addPost(destination = destination, description = description)
