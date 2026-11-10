@@ -14,6 +14,16 @@ import kotlinx.serialization.json.put
 class ProfileRepository {
     private val supabase = SupabaseProvider.client
 
+    // Pass the uploaded Storage path, or "" to clear the picture. Other profile
+    // fields stay unchanged; the database validates ownership and the upload.
+    suspend fun updateMyProfilePhoto(photoPath: String): Profile {
+        supabase.auth.awaitInitialization()
+        checkNotNull(supabase.auth.currentUserOrNull()) { "Sign in before saving a profile photo." }
+        return supabase.postgrest.rpc("set_my_profile_photo", buildJsonObject {
+            put("photo_path", photoPath)
+        }).decodeAs<Profile>()
+    }
+
     // Only accepted friends can load this summary. Visit evidence stays private.
     // Returns null when the friend has not created their profile yet.
     suspend fun getFriendTravelProfile(userId: String): FriendTravelProfile? {
