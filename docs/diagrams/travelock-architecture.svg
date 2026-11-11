@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1070" viewBox="0 0 1600 1070">
+<rect width="100%" height="100%" fill="#FFFFFF"/>
+<text x="60" y="48" dominant-baseline="text-before-edge" font-family="Segoe UI, Arial, sans-serif" font-size="40" font-weight="700" fill="#142D42">Travelock architecture</text>
+<text x="60" y="105" dominant-baseline="text-before-edge" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="400" fill="#526779">Current backend structure • Dashed connection = screen integration still pending</text>
+<text x="60" y="155" dominant-baseline="text-before-edge" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" fill="#526779">ANDROID APP</text>
+<text x="1100" y="155" dominant-baseline="text-before-edge" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" fill="#526779">SUPABASE</text>
+<rect x="60" y="200" width="400" height="135" rx="14" fill="#FFF4DC" stroke="#D1AD61" stroke-width="2"/>
+<text x="82" y="218" dominant-baseline="text-before-edge" font-family="Segoe UI, Arial, sans-serif" font-size="25" font-weight="700" fill="#142D42">Compose screens</text>
+<text x="82" y="260" dominant-baseline="text-before-edge" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#243E50">Several screens use mocks.</text>
+<text x="82" y="290" dominant-baseline="text-before-edge" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#243E50">Connect real backend calls.</text>
+<rect x="60" y="390" width="400" height="180" rx="14" fill="#EAF3FA" stroke="#77A5C5" stroke-width="2"/>
+<text x="82" y="408" dominant-baseline="text-before-edge" font-family="Segoe UI, Arial, sans-serif" font-size="25" font-weight="700" fill="#142D42">Visit coordinators</text>
+<text x="82" y="450" dominant-baseline="text-before-edge" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#243E50">QR and live camera flow</text>
+<text x="82" y="480" dominant-baseline="text-before-edge" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#243E50">Location, upload and retry</text>
+<text x="82" y="510" dominant-baseline="text-before-edge" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#243E50">Save / restore / cancellation</text>
+<rect x="570" y="200" width="400" height="220" rx="14" fill="#EAF3FA" stroke="#77A5C5" stroke-width="2"/>
+<text x="592" y="218" dominant-baseline="text-before-edge" font-family="Segoe UI, Arial, sans-serif" font-size="25" font-weight="700" fill="#142D42">Repositories + models</text>
+<text x="592" y="260" dominant-baseline="text-before-edge" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#243E50">Auth and profile onboarding</text>
+<text x="592" y="290" dominant-baseline="text-before-edge" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#243E50">Catalogue, visits, achievements</text>
+<text x="592" y="320" dominant-baseline="text-before-edge" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#243E50">Friends, posts, notifications</text>
+<text x="592" y="350" dominant-baseline="text-before-edge" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#243E50">Map and route data helpers</text>
+<rect x="570" y="530" width="400" height="135" rx="14" fill="#EAF3FA" stroke="#77A5C5" stroke-width="2"/>
+<text x="592" y="548" dominant-baseline="text-before-edge" font-family="Segoe UI, Arial, sans-serif" font-size="25" font-weight="700" fill="#142D42">SupabaseProvider</text>
+<text x="592" y="590" dominant-baseline="text-before-edge" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#243E50">Shared Kotlin SDK client</text>
+<text x="592" y="620" dominant-baseline="text-before-edge" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#243E50">Auth • Postgrest • Storage</text>
+<rect x="60" y="690" width="400" height="135" rx="14" fill="#EAF3FA" stroke="#77A5C5" stroke-width="2"/>
+<text x="82" y="708" dominant-baseline="text-before-edge" font-family="Segoe UI, Arial, sans-serif" font-size="25" font-weight="700" fill="#142D42">Android device services</text>
+<text x="82" y="750" dominant-baseline="text-before-edge" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#243E50">QR scanner • system camera</text>
+<text x="82" y="780" dominant-baseline="text-before-edge" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#243E50">Current location provider</text>
+<rect x="60" y="870" width="400" height="110" rx="14" fill="#EAF3FA" stroke="#77A5C5" stroke-width="2"/>
+<text x="82" y="888" dominant-baseline="text-before-edge" font-family="Segoe UI, Arial, sans-serif" font-size="25" font-weight="700" fill="#142D42">Local visit checkpoint</text>
+<text x="82" y="930" dominant-baseline="text-before-edge" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#243E50">Attempt metadata + photo path</text>
+<rect x="1100" y="200" width="440" height="135" rx="14" fill="#E6F4EC" stroke="#7BAC91" stroke-width="2"/>
+<text x="1122" y="218" dominant-baseline="text-before-edge" font-family="Segoe UI, Arial, sans-serif" font-size="25" font-weight="700" fill="#142D42">Supabase Auth</text>
+<text x="1122" y="260" dominant-baseline="text-before-edge" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#243E50">Email/password and Google</text>
+<text x="1122" y="290" dominant-baseline="text-before-edge" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#243E50">Sessions and password recovery</text>
+<rect x="1100" y="400" width="440" height="200" rx="14" fill="#E6F4EC" stroke="#7BAC91" stroke-width="2"/>
+<text x="1122" y="418" dominant-baseline="text-before-edge" font-family="Segoe UI, Arial, sans-serif" font-size="25" font-weight="700" fill="#142D42">PostgreSQL database</text>
+<text x="1122" y="460" dominant-baseline="text-before-edge" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#243E50">Tables + row-level security</text>
+<text x="1122" y="490" dominant-baseline="text-before-edge" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#243E50">Server functions validate visits.</text>
+<text x="1122" y="520" dominant-baseline="text-before-edge" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#243E50">Triggers update achievements</text>
+<text x="1122" y="550" dominant-baseline="text-before-edge" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#243E50">and in-app notifications.</text>
+<rect x="1100" y="740" width="440" height="165" rx="14" fill="#E6F4EC" stroke="#7BAC91" stroke-width="2"/>
+<text x="1122" y="758" dominant-baseline="text-before-edge" font-family="Segoe UI, Arial, sans-serif" font-size="25" font-weight="700" fill="#142D42">Supabase Storage</text>
+<text x="1122" y="800" dominant-baseline="text-before-edge" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#243E50">Private visit, post, profile photos</text>
+<text x="1122" y="830" dominant-baseline="text-before-edge" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#243E50">Access follows ownership</text>
+<text x="1122" y="860" dominant-baseline="text-before-edge" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#243E50">and post visibility rules.</text>
+<polyline points="460,260 570,260" fill="none" stroke="#55738A" stroke-width="2.5" stroke-dasharray="8 6"/>
+<polygon points="570,260 558,266 558,254" fill="#55738A"/>
+<polyline points="260,335 260,390" fill="none" stroke="#55738A" stroke-width="2.5" stroke-dasharray="8 6"/>
+<polygon points="260,390 254,378 266,378" fill="#55738A"/>
+<polyline points="460,470 510,470 510,360 570,360" fill="none" stroke="#55738A" stroke-width="2.5" />
+<polygon points="570,360 558,366 558,354" fill="#55738A"/>
+<polyline points="770,420 770,530" fill="none" stroke="#55738A" stroke-width="2.5" />
+<polygon points="770,530 764,518 776,518" fill="#55738A"/>
+<polyline points="260,690 260,570" fill="none" stroke="#55738A" stroke-width="2.5" />
+<polygon points="260,570 266,582 254,582" fill="#55738A"/>
+<polyline points="460,925 505,925 505,545 460,545" fill="none" stroke="#55738A" stroke-width="2.5" />
+<polygon points="460,545 472,539 472,551" fill="#55738A"/>
+<polyline points="970,560 1030,560 1030,265 1100,265" fill="none" stroke="#55738A" stroke-width="2.5" />
+<polygon points="1100,265 1088,271 1088,259" fill="#55738A"/>
+<polyline points="970,595 1060,595 1060,500 1100,500" fill="none" stroke="#55738A" stroke-width="2.5" />
+<polygon points="1100,500 1088,506 1088,494" fill="#55738A"/>
+<polyline points="970,630 1030,630 1030,820 1100,820" fill="none" stroke="#55738A" stroke-width="2.5" />
+<polygon points="1100,820 1088,826 1088,814" fill="#55738A"/>
+<text x="570" y="770" dominant-baseline="text-before-edge" font-family="Segoe UI, Arial, sans-serif" font-size="25" font-weight="700" fill="#142D42">Maps and routes</text>
+<text x="570" y="813" dominant-baseline="text-before-edge" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#243E50">Real destination/status data is available.</text>
+<text x="570" y="847" dominant-baseline="text-before-edge" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#243E50">Route totals use straight-line distances.</text>
+<text x="570" y="881" dominant-baseline="text-before-edge" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#243E50">Map rendering and road directions are pending.</text>
+<text x="60" y="1020" dominant-baseline="text-before-edge" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#526779">Backend components are implemented; this diagram does not claim every production screen is connected.</text>
+</svg>
