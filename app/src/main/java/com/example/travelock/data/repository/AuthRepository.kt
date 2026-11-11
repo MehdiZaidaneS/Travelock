@@ -4,6 +4,7 @@ import com.example.travelock.BuildConfig
 import com.example.travelock.data.SupabaseProvider
 import com.example.travelock.data.auth.GoogleSignInNonce
 import com.example.travelock.data.auth.PasswordRecoveryLinks
+import com.example.travelock.data.auth.SessionRefreshPolicy
 import com.example.travelock.data.model.AuthUser
 import com.example.travelock.data.model.RegistrationResult
 import io.github.jan.supabase.auth.SignOutScope
@@ -12,6 +13,10 @@ import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.auth.providers.builtin.IDToken
 import io.github.jan.supabase.auth.providers.Google
+import io.github.jan.supabase.auth.exception.AuthRestException
+import io.github.jan.supabase.auth.exception.AuthSessionMissingException
+import io.github.jan.supabase.auth.status.SessionStatus
+import io.github.jan.supabase.exceptions.RestException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 
@@ -79,9 +84,40 @@ class AuthRepository {
 
     // Reads the restored local session. Protected requests still rely on server RLS.
     suspend fun getCurrentUser(): AuthUser? {
-        supabase.auth.awaitInitialization()
+        awaitReadableSession()
         val user = supabase.auth.currentSessionOrNull()?.user ?: return null
         return AuthUser(user.id, user.email)
+    }
+
+    // Normally the SDK refreshes automatically. Use this when an explicit server
+    // refresh is needed. Null means signed out; temporary failures still throw.
+    suspend fun refreshSession(): AuthUser? {
+        awaitReadableSession()
+        val original = supabase.auth.currentSessionOrNull() ?: return null
+        try {
+            supabase.auth.refreshCurrentSession()
+        } catch (error: RestException) {
+            val code = when (error) {
+                is AuthSessionMissingException -> "session_not_found"
+                is AuthRestException -> error.errorCode?.value ?: error.error
+                else -> error.error
+            }
+            if (!SessionRefreshPolicy.isInvalidSession(error.statusCode,code)) throw error
+            val current = supabase.auth.currentSessionOrNull()
+            check(current == null || (current.user?.id == original.user?.id && current.refreshToken == original.refreshToken)) {
+                "The session changed. Reload the current account."
+            }
+            withContext(NonCancellable) { supabase.auth.clearSession() }
+            return null
+        }
+        return checkNotNull(getCurrentUser()) { "Session refresh did not restore the account." }
+    }
+
+    private suspend fun awaitReadableSession() {
+        supabase.auth.awaitInitialization()
+        check(supabase.auth.sessionStatus.value !is SessionStatus.RefreshFailure) {
+            "The saved session could not be refreshed. Check your connection and retry."
+        }
     }
 
     suspend fun logout() {
