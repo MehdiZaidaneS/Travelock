@@ -2,6 +2,7 @@ package com.example.travelock.data.repository
 
 import com.example.travelock.BuildConfig
 import com.example.travelock.data.SupabaseProvider
+import com.example.travelock.data.auth.GoogleSignInNonce
 import com.example.travelock.data.auth.PasswordRecoveryLinks
 import com.example.travelock.data.model.AuthUser
 import com.example.travelock.data.model.RegistrationResult
@@ -9,12 +10,31 @@ import io.github.jan.supabase.auth.SignOutScope
 import io.github.jan.supabase.auth.OtpType
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
+import io.github.jan.supabase.auth.providers.builtin.IDToken
+import io.github.jan.supabase.auth.providers.Google
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 
 // Supabase errors and coroutine cancellation propagate to the caller.
 class AuthRepository {
     private val supabase = SupabaseProvider.client
+
+    // Google supplies the token; Supabase verifies it and creates/restores the
+    // Auth account. Profile onboarding remains separate, as with email sign-in.
+    suspend fun signInWithGoogle(idToken: String, nonce: GoogleSignInNonce): AuthUser {
+        require(idToken.isNotBlank()) { "A Google ID token is required." }
+        supabase.auth.awaitInitialization()
+        check(supabase.auth.currentSessionOrNull() == null) {
+            "Sign out before signing in to another account."
+        }
+        val rawNonce = nonce.consume()
+        supabase.auth.signInWith(IDToken) {
+            provider = Google
+            this.idToken = idToken
+            this.nonce = rawNonce
+        }
+        return checkNotNull(getCurrentUser()) { "Google sign-in did not create a session." }
+    }
 
     suspend fun registerWithEmail(email: String, password: String): RegistrationResult {
         require(email.isNotBlank()) { "Email cannot be blank." }

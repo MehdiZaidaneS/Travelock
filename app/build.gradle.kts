@@ -79,4 +79,8 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
+    // Native account picker for the opt-in Google sign-in test; no release UI wiring.
+    debugImplementation(libs.androidx.credentials)
+    debugImplementation(libs.androidx.credentials.play.services.auth)
+    debugImplementation(libs.google.identity)
 }
