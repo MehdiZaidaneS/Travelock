@@ -12,5 +12,5 @@ data class Location(
     val latitude: Double,
     val longitude: Double,
     val image: String,
-    val destinations: List<Destination> = emptyList(),
+    var destinations: List<Destination> = emptyList(),
 )

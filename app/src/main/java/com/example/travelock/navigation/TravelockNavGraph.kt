@@ -1,10 +1,16 @@
 package com.example.travelock.navigation
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -12,6 +18,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.core.content.ContextCompat
 import com.example.travelock.data.mock.MockLocations
 import com.example.travelock.data.mock.MockSessionState
 import com.example.travelock.data.mock.MockUsers
@@ -30,6 +37,7 @@ import com.example.travelock.ui.screens.notifications.NotificationsScreen
 import com.example.travelock.ui.screens.profile.EditProfileScreen
 import com.example.travelock.ui.screens.profile.FriendProfileScreen
 import com.example.travelock.ui.screens.profile.ProfileScreen
+import com.example.travelock.ui.viewmodel.LocationViewModel
 import kotlinx.coroutines.launch
 
 /**
@@ -40,6 +48,7 @@ import kotlinx.coroutines.launch
 fun TravelockNavGraph(
     currentThemeMode: ThemeMode,
     onThemeModeChange: (ThemeMode) -> Unit,
+    locationViewModel: LocationViewModel,
     authRepository: AuthRepository = remember { AuthRepository() }
 ) {
     val scope = rememberCoroutineScope()
@@ -154,6 +163,52 @@ fun TravelockNavGraph(
         return
     }
 
+    val context = LocalContext.current
+
+    val currentLocation by
+    locationViewModel.currentLocation.collectAsState()
+
+    val locationPermissionLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.RequestMultiplePermissions()
+        ) { permissions ->
+
+            val granted =
+                permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+                        permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+
+            if (granted) {
+                locationViewModel.refreshLocation()
+            }
+        }
+
+    LaunchedEffect(Unit) {
+
+        val fineGranted = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+
+        val coarseGranted = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (fineGranted || coarseGranted) {
+
+            locationViewModel.refreshLocation()
+
+        } else {
+
+            locationPermissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
+        }
+    }
+
     // ── Authenticated Flow (Scaffold + TopBar + BottomNavBar T-01) ─────────────
     val activeLocationName = remember(activeLocationId) {
         MockLocations.allLocations.find { it.locationId == activeLocationId }?.name
@@ -198,7 +253,9 @@ fun TravelockNavGraph(
                 .padding(innerPadding)
         ) {
             when (currentMainRoute) {
-                BottomNavTab.HOME.route -> MainScreen()
+                BottomNavTab.HOME.route -> MainScreen(
+                    currentLocation = currentLocation
+                )
 
                 BottomNavTab.FEED.route -> FeedScreen(
                     currentUserId = loggedInUser?.userId ?: MockUsers.currentUser.userId,

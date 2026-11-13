@@ -141,7 +141,7 @@ fun LocationCard(
 
                     Row{
                         Text(
-                            text = "0/3 destinations unlocked",
+                            text = "0/${location.destinations.size} destinations unlocked",
                             color = Color.White,
                             fontStyle = FontStyle.Italic,
                         )

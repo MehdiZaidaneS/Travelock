@@ -8,38 +8,32 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.example.travelock.data.mock.repository.ExploreRepository
 
 import com.example.travelock.data.model.Location
 import com.example.travelock.data.model.Destination
+import com.example.travelock.data.repository.LocationRepository
 
 import com.example.travelock.ui.components.DestinationCard
 import com.example.travelock.ui.components.ExtendedDestinationCard
 import com.example.travelock.ui.components.ExtendedLocationCard
 import com.example.travelock.ui.components.LocationCard
 import com.example.travelock.ui.components.TravelockSearchBar
+import com.example.travelock.data.location.DeviceLocationResult
+
 
 @Composable
 fun MainScreen(
-    exploreRepository: ExploreRepository = remember { ExploreRepository() },
+    locationRepository: LocationRepository = remember { LocationRepository() },
     onUnlockQr: (Destination) -> Unit = {},
     onUnlockCamera: (Destination) -> Unit = {},
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    currentLocation: DeviceLocationResult?
 ) {
     var searchQuery by remember { mutableStateOf("") }
 
     var locations by remember {
         mutableStateOf<List<Location>>(emptyList())
     }
-
-    val enrolledLocationIds by
-    exploreRepository.enrolledLocationIdsFlow.collectAsState()
-
-    val unlockedDestinations by
-    exploreRepository.unlockedDestinationsFlow.collectAsState()
-
-    val activeLocationId by
-    exploreRepository.activeLocationIdFlow.collectAsState()
 
     var selectedLocation by remember {
         mutableStateOf<Location?>(null)
@@ -49,17 +43,26 @@ fun MainScreen(
         mutableStateOf<Destination?>(null)
     }
 
+    /*val enrolledLocationIds by
+    exploreRepository.enrolledLocationIdsFlow.collectAsState()
+
+    val unlockedDestinations by
+    exploreRepository.unlockedDestinationsFlow.collectAsState()
+
+    val activeLocationId by
+    exploreRepository.activeLocationIdFlow.collectAsState()*/
+
     // SEARCH LOCATIONS
     LaunchedEffect(searchQuery) {
-        locations = exploreRepository.searchLocations(searchQuery)
+        locations = locationRepository.searchLocations(searchQuery)
     }
 
     // CHECK IF DESTINATION IS UNLOCKED
-    fun isUnlocked(destinationId: String): Boolean {
+    /*fun isUnlocked(destinationId: String): Boolean {
         return unlockedDestinations.any {
             it.destinationId == destinationId
         }
-    }
+    }*/
 
     // EXTENDED DESTINATION SCREEN
     if (selectedDestination != null) {
@@ -67,7 +70,7 @@ fun MainScreen(
 
         ExtendedDestinationCard(
             destination = destination,
-            isLocked = !isUnlocked(destination.destinationId),
+            isLocked = true/*!isUnlocked(destination.destinationId)*/,
 
             onBack = {
                 selectedDestination = null
@@ -89,9 +92,11 @@ fun MainScreen(
     if (selectedLocation != null) {
         val location = selectedLocation!!
 
+
+
         ExtendedLocationCard(
             location = location,
-            isLocked = !enrolledLocationIds.contains(location.locationId),
+            isLocked = true/*!enrolledLocationIds.contains(location.locationId)*/,
 
             onBack = {
                 selectedLocation = null
@@ -125,7 +130,7 @@ fun MainScreen(
             )
         }
 
-        // ACTIVE LOCATION
+        /*// ACTIVE LOCATION
         val activeLocation = locations.find {
             it.locationId == activeLocationId
         }
@@ -149,7 +154,7 @@ fun MainScreen(
 
                         DestinationCard(
                             destination = destination,
-                            isLocked = !isUnlocked(destination.destinationId),
+                            isLocked = true,*//*!isUnlocked(destination.destinationId)*//*
                             onClick = {
                                 selectedDestination = destination
                             }
@@ -158,7 +163,7 @@ fun MainScreen(
                 }
             }
         }
-
+*/
         // LOCATIONS HEADER
         item {
             Column(
@@ -171,6 +176,18 @@ fun MainScreen(
                         "Search results (${locations.size})"
                     },
                     style = MaterialTheme.typography.titleLarge
+                )
+
+                val availableLocation =
+                    currentLocation as? DeviceLocationResult.Available
+
+                Text(
+                    text = if (availableLocation != null) {
+                        "Latitude: ${availableLocation.latitude}\n" +
+                                "Longitude: ${availableLocation.longitude}"
+                    } else {
+                        "Location not available yet"
+                    }
                 )
 
                 Text(
@@ -200,8 +217,7 @@ fun MainScreen(
                 key = { it.locationId }
             ) { location ->
 
-                val isEnrolled =
-                    enrolledLocationIds.contains(location.locationId)
+                val isEnrolled = false
 
                 LocationCard(
                     location = location,
