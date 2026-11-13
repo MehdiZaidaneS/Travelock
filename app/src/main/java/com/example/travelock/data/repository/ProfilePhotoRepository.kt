@@ -9,8 +9,16 @@ import java.util.UUID
 class ProfilePhotoRepository {
     private val supabase = SupabaseProvider.client
 
+    // The bucket stays private; Storage checks access using the current session.
+    suspend fun downloadProfilePhoto(path: String): ByteArray {
+        require(path.isNotBlank()) { "A profile photo path is required." }
+        supabase.auth.awaitInitialization()
+        checkNotNull(supabase.auth.currentUserOrNull()) { "Sign in before loading a profile photo." }
+        return supabase.storage.from("profile-photos").downloadAuthenticated(path)
+    }
+
     // The frontend supplies JPEG bytes from its camera or image-selection flow.
-    // Upload first, then save the returned path with updateMyProfilePhoto.
+    // Upload first, then attach the path during onboarding or a profile update.
     suspend fun uploadProfilePhoto(jpegBytes: ByteArray): String {
         require(jpegBytes.isNotEmpty()) { "The profile photo cannot be empty." }
         require(jpegBytes.size <= 10 * 1024 * 1024) { "The profile photo must be at most 10 MiB." }

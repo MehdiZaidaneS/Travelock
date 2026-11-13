@@ -17,26 +17,24 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.travelock.ui.theme.ThemeMode
 import com.example.travelock.ui.theme.TravelockTheme
+import com.example.travelock.data.auth.RegistrationPasswordPolicy
 
-/**
- * T-05: Registration Page supporting Account Registration (PBI-01) and Google Auth (PBI-02).
- * Retains backward-compatible `onRegisterClick: (email, pass) -> Unit` default while also offering
- * `onRegisterFullClick: (email, pass, username, name) -> Unit`.
- */
+/** Account credentials only. Profile details are collected after authentication. */
 @Composable
 fun RegisterScreen(
-    onRegisterClick: (email: String, pass: String) -> Unit = { _, _ -> },
-    onRegisterFullClick: ((email: String, pass: String, confirmPass: String, username: String, name: String) -> Unit)? = null,
+    onRegisterClick: (email: String, pass: String, confirmPass: String) -> Unit = { _, _, _ -> },
     onGoogleSignInClick: () -> Unit = {},
     onNavigateToLogin: () -> Unit = {},
     onNavigateBack: () -> Unit = {},
-    errorMessage: String? = null
+    errorMessage: String? = null,
+    isLoading: Boolean = false,
+    passwordError: String? = null,
+    onPasswordEdited: () -> Unit = {}
 ) {
-    var username by remember { mutableStateOf("mehdi_z") }
-    var fullName by remember { mutableStateOf("Mehdi Zaidane") }
-    var email by remember { mutableStateOf("mehdi@travelock.fi") }
-    var password by remember { mutableStateOf("password123") }
-    var confirmPassword by remember { mutableStateOf("password123") }
+    var email by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
+    val missingRequirements = RegistrationPasswordPolicy.missingRequirements(password)
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -61,7 +59,7 @@ fun RegisterScreen(
             Spacer(modifier = Modifier.height(6.dp))
 
             Text(
-                text = "Join Travelock and start unlocking Helsinki",
+                text = "Create your account first. Set up your profile after signing in.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -87,28 +85,6 @@ fun RegisterScreen(
             }
 
             OutlinedTextField(
-                value = username,
-                onValueChange = { username = it },
-                label = { Text("Username") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                shape = MaterialTheme.shapes.medium
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            OutlinedTextField(
-                value = fullName,
-                onValueChange = { fullName = it },
-                label = { Text("Full Name") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                shape = MaterialTheme.shapes.medium
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            OutlinedTextField(
                 value = email,
                 onValueChange = { email = it },
                 label = { Text("Email") },
@@ -121,8 +97,18 @@ fun RegisterScreen(
 
             OutlinedTextField(
                 value = password,
-                onValueChange = { password = it },
+                onValueChange = { password = it; onPasswordEdited() },
                 label = { Text("Password") },
+                enabled = !isLoading,
+                isError = passwordError != null || (password.isNotEmpty() && missingRequirements.isNotEmpty()),
+                supportingText = {
+                    Column {
+                        if (passwordError != null) Text(passwordError)
+                        else if (password.isEmpty()) Text("Use at least 8 characters, with lowercase and uppercase letters, a digit and a symbol (such as !, @ or #).")
+                        else if (missingRequirements.isEmpty()) Text("Password requirements met.")
+                        else missingRequirements.forEach { Text("• $it") }
+                    }
+                },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
@@ -135,6 +121,11 @@ fun RegisterScreen(
                 value = confirmPassword,
                 onValueChange = { confirmPassword = it },
                 label = { Text("Confirm Password") },
+                enabled = !isLoading,
+                isError = confirmPassword.isNotEmpty() && confirmPassword != password,
+                supportingText = {
+                    if (confirmPassword.isNotEmpty() && confirmPassword != password) Text("Passwords do not match.")
+                },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
@@ -144,13 +135,8 @@ fun RegisterScreen(
             Spacer(modifier = Modifier.height(22.dp))
 
             Button(
-                onClick = {
-                    if (onRegisterFullClick != null) {
-                        onRegisterFullClick(email, password, confirmPassword, username, fullName)
-                    } else {
-                        onRegisterClick(email, password)
-                    }
-                },
+                onClick = { onRegisterClick(email, password, confirmPassword) },
+                enabled = !isLoading,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp),
@@ -160,13 +146,14 @@ fun RegisterScreen(
                     contentColor = MaterialTheme.colorScheme.onPrimary
                 )
             ) {
-                Text(text = "Register", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Text(text = if (isLoading) "Please wait…" else "Create account", fontSize = 16.sp, fontWeight = FontWeight.Bold)
             }
 
             Spacer(modifier = Modifier.height(12.dp))
 
             OutlinedButton(
                 onClick = onGoogleSignInClick,
+                enabled = !isLoading,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp),
@@ -187,14 +174,14 @@ fun RegisterScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            TextButton(onClick = onNavigateToLogin) {
+            TextButton(onClick = onNavigateToLogin, enabled = !isLoading) {
                 Text(
                     text = "Already have an account? Log In",
                     color = MaterialTheme.colorScheme.primary
                 )
             }
 
-            TextButton(onClick = onNavigateBack) {
+            TextButton(onClick = onNavigateBack, enabled = !isLoading) {
                 Text(
                     text = "Back to Landing Page",
                     color = MaterialTheme.colorScheme.onSurfaceVariant

@@ -39,6 +39,7 @@ import com.example.travelock.data.mock.repository.UserRepository
 import com.example.travelock.ui.components.AchievementBadgeCard
 import com.example.travelock.ui.components.ThemeSwitcher
 import com.example.travelock.ui.components.UserAvatarCircle
+import com.example.travelock.ui.components.ProfilePhotoAvatar
 
 /**
  * PBI-26 to PBI-30: Personal User Profile Screen (Steps 4, 21, 23 of Travelock.pdf).
@@ -52,10 +53,12 @@ fun ProfileScreen(
     onEditProfileClick: () -> Unit,
     onFriendClick: (String) -> Unit,
     onLogoutClick: () -> Unit,
-    userRepository: UserRepository = remember { UserRepository() }
+    userRepository: UserRepository = remember { UserRepository() },
+    displayUser: com.example.travelock.data.model.User? = null,
+    allowProfileEditing: Boolean = true
 ) {
     val currentUser by userRepository.currentUserFlow.collectAsState()
-    val user = currentUser ?: MockUsers.currentUser
+    val user = displayUser ?: currentUser ?: MockUsers.currentUser
     val achievements by userRepository.achievementsFlow.collectAsState()
     val unlocks by userRepository.unlocksFlow.collectAsState()
     val friends by userRepository.friendsFlow.collectAsState()
@@ -80,7 +83,8 @@ fun ProfileScreen(
                         .padding(20.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    UserAvatarCircle(
+                    if (displayUser != null) ProfilePhotoAvatar(user, 80.dp)
+                    else UserAvatarCircle(
                         name = user.name,
                         username = user.username,
                         size = 80.dp
@@ -117,6 +121,7 @@ fun ProfileScreen(
                     ) {
                         OutlinedButton(
                             onClick = onEditProfileClick,
+                            enabled = allowProfileEditing,
                             modifier = Modifier.weight(1f)
                         ) {
                             Icon(

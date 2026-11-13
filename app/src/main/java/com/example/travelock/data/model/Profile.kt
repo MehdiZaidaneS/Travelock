@@ -11,6 +11,7 @@ data class Profile(
     val username: String,
     val name: String,
     @SerialName("profile_image")
+    // Empty, an owned Storage path, or a bundled preset:moods_01 through _12 ID.
     val profileImage: String = "",
     @SerialName("created_at")
     @Serializable(with = InstantSerializer::class)

@@ -17,7 +17,13 @@ AuthRepository:
 - sendPasswordResetEmail(email) = requests a recovery email.
 - resetPasswordFromLink(email, recoveryLink, newPassword) = verifies the recovery link, changes the password and clears the recovery session.
 
-Passwords stay in Supabase Auth. Production Google-button wiring, automatic email-link routing and the new-password form remain UI work. Live session refresh/restart checks are still unverified.
+Passwords stay in Supabase Auth. Registration/login now use the real AuthRepository through AuthViewModel and AuthFlowController. Registration collects email, password and password confirmation only. Its live password validator matches the confirmed Supabase policy: at least 8 characters with lowercase and uppercase ASCII letters, a digit and a supported symbol. Submit rechecks those rules, and Supabase weak-password reason codes produce safe field errors. Keep this policy aligned if dashboard settings change; Supabase remains authoritative. Email signup shows a confirmation screen; open the email link in a browser, then return and sign in. Google sign-in uses the native Credential Manager picker and the existing nonce exchange.
+
+After sign-in or a restored session, getState() chooses profile setup for NeedsProfile or the main app for Ready. Profile setup asks for username and full name, with an optional image: choose one of 12 bundled DiceBear Moods avatars, upload a photo through Android Photo Picker, or skip and keep initials. Only one option is saved. Preset selection stores preset:moods_01 through preset:moods_12 in profile_image and needs no image upload or DiceBear request. Apply migration 20261113000000_profile_avatar_presets.sql after the existing profile-photo migration before saving a preset. It previews the selection and allows change/remove. For uploaded photos, on save it decodes a thumbnail (at most 1024 pixels on its longest side), converts it to JPEG, uploads it and attaches the private Storage path through completeProfile(). A photo-read/upload failure keeps setup open; it never silently drops a selected image. Uploaded paths are reused for retries with the same account/photo during this screen session. Uploads abandoned by changing/removing the selection can remain unreferenced; automatic cleanup is not implemented. Closing the app before setup is finished returns to setup on the next launch. Profile-load failures show retry/sign-out; they do not enter the app. Existing profiles are preserved.
+
+Set GOOGLE_WEB_CLIENT_ID in each developer's ignored local.properties to the Google Web OAuth client ID, then rebuild. This is a public client ID, never the client secret. Google picker dependencies are included in release builds as well as debug. Keep Supabase Confirm email enabled and Google nonce checking enabled.
+
+The My Profile header displays the real account/profile and renders a known preset from bundled resources, or loads an uploaded photo with the authenticated Storage API, falling back to initials when absent or unavailable. Its Edit Profile button is disabled while editing integration is deferred. Other main-app screens and travel/social data still use their existing mocks. Automatic email-link routing and the new-password form remain UI work. The Forgot Password button requests a real recovery email. Live session refresh/restart checks are still unverified.
 
 ## Profiles
 
@@ -26,21 +32,23 @@ An Auth user is the login account. A Profile holds the username, name and profil
 ProfileOnboardingRepository:
 
 - getState() = returns SignedOut, NeedsProfile(user), or Ready(user, profile).
-- completeProfile(username, name, profileImage = "") = creates a missing profile; cannot overwrite an existing one.
+- completeProfile(username, name, profileImage = "") = creates a missing profile; cannot overwrite an existing one. profileImage is empty, a supported preset ID, or an owned uploaded-photo path.
 
 ProfileRepository:
 
 - getMyProfile() = returns the current user's profile, or null if missing.
 - createMyProfile(username, name, profileImage = "") = creates it. Username/name are required; username is unique.
 - updateMyProfile(username, name, profileImage) = saves all editable fields. Pass the current image path to keep the photo.
-- updateMyProfilePhoto(photoPath) = changes only the photo; an empty string clears it.
+- updateMyProfilePhoto(photoPath) = changes only the image; accepts a supported preset ID or uploaded photo path. An empty string clears it.
 - searchProfiles(query) = searches username/name, excluding self. Up to 20 results; blank input returns none.
 - getProfileSummary(userId) = returns basic profile information for a signed-in viewer.
 - getFriendTravelProfile(userId) = returns an accepted friend's profile, earned achievements and unlocks. Self, unrelated users and pending requests are denied.
 
-ProfilePhotoRepository.uploadProfilePhoto(jpegBytes) = uploads a JPEG up to 10 MiB and returns a private path. Save it through the profile update.
+ProfilePhotoRepository.uploadProfilePhoto(jpegBytes) = uploads a JPEG up to 10 MiB and returns a private path. Attach it during profile creation or through a profile update.
 
-New paths must belong to the current user. Signed-in users can read an attached profile photo; guests cannot. Old uploads remain owner-readable; cleanup is not implemented. Unchanged legacy image values can be preserved.
+ProfilePhotoRepository.downloadProfilePhoto(path) = downloads an uploaded profile image using the current session; Storage policies decide access. Resolve preset IDs locally instead. The bucket remains private.
+
+Preset IDs are exactly preset:moods_01 through preset:moods_12 and refer to fixed bundled PNGs. ProfileAvatarPresets.find(profileImage) = resolves a known preset to its local drawable; check this before requesting Storage. Unknown preset IDs are rejected on save. Presets need no Storage object. New uploaded paths must belong to the current user. Signed-in users can read an attached profile photo; guests cannot. Old uploads remain owner-readable; cleanup is not implemented. Unchanged legacy image values can be preserved.
 
 Discovery exposes basic profiles, not email/private visit evidence. Custom profile visibility settings are not implemented.
 

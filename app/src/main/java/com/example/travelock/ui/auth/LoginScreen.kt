@@ -30,10 +30,11 @@ fun LoginScreen(
     onNavigateToRegister: () -> Unit = {},
     onNavigateBack: () -> Unit = {},
     errorMessage: String? = null,
-    infoMessage: String? = null
+    infoMessage: String? = null,
+    isLoading: Boolean = false
 ) {
-    var email by remember { mutableStateOf("mehdi@travelock.fi") }
-    var password by remember { mutableStateOf("password123") }
+    var email by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -126,7 +127,7 @@ fun LoginScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End
             ) {
-                TextButton(onClick = { onResetPasswordClick(email) }) {
+                TextButton(onClick = { onResetPasswordClick(email) }, enabled = !isLoading) {
                     Text(
                         text = "Forgot Password?",
                         style = MaterialTheme.typography.labelLarge,
@@ -139,6 +140,7 @@ fun LoginScreen(
 
             Button(
                 onClick = { onLoginClick(email, password) },
+                enabled = !isLoading,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp),
@@ -148,7 +150,7 @@ fun LoginScreen(
                     contentColor = MaterialTheme.colorScheme.onPrimary
                 )
             ) {
-                Text(text = "Log In", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Text(text = if (isLoading) "Please wait…" else "Log In", fontSize = 16.sp, fontWeight = FontWeight.Bold)
             }
 
             Spacer(modifier = Modifier.height(14.dp))
@@ -156,6 +158,7 @@ fun LoginScreen(
             // PBI-02: Log in using Google
             OutlinedButton(
                 onClick = onGoogleSignInClick,
+                enabled = !isLoading,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp),
@@ -176,14 +179,14 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            TextButton(onClick = onNavigateToRegister) {
+            TextButton(onClick = onNavigateToRegister, enabled = !isLoading) {
                 Text(
                     text = "Don't have an account? Register",
                     color = MaterialTheme.colorScheme.primary
                 )
             }
 
-            TextButton(onClick = onNavigateBack) {
+            TextButton(onClick = onNavigateBack, enabled = !isLoading) {
                 Text(
                     text = "Back to Landing Page",
                     color = MaterialTheme.colorScheme.onSurfaceVariant
