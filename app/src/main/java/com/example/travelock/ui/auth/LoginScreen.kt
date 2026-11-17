@@ -26,7 +26,7 @@ import com.example.travelock.ui.theme.TravelockTheme
 fun LoginScreen(
     onLoginClick: (email: String, pass: String) -> Unit = { _, _ -> },
     onGoogleSignInClick: () -> Unit = {},
-    onResetPasswordClick: (email: String) -> Unit = {},
+    onResetPasswordClick: () -> Unit = {},
     onNavigateToRegister: () -> Unit = {},
     onNavigateBack: () -> Unit = {},
     errorMessage: String? = null,
@@ -127,7 +127,7 @@ fun LoginScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End
             ) {
-                TextButton(onClick = { onResetPasswordClick(email) }, enabled = !isLoading) {
+                TextButton(onClick = onResetPasswordClick, enabled = !isLoading) {
                     Text(
                         text = "Forgot Password?",
                         style = MaterialTheme.typography.labelLarge,

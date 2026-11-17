@@ -12,8 +12,12 @@ fun AuthEntry(flow: AuthFlowController, state: AuthFlowState) {
     val context = LocalContext.current
     val google = remember(context) { GoogleAccountSignIn(context) }
     val signOut: () -> Unit = { flow.logout { google.clearCredentialState() } }
-    BackHandler(enabled = state.page in setOf(AuthPage.LOGIN, AuthPage.REGISTER, AuthPage.CONFIRM_EMAIL)) {
-        flow.navigate(AuthPage.LANDING)
+    BackHandler(enabled = state.page in setOf(AuthPage.LOGIN, AuthPage.REGISTER, AuthPage.CONFIRM_EMAIL, AuthPage.RESET_EMAIL, AuthPage.RECOVERY)) {
+        flow.navigate(when (state.page) {
+            AuthPage.RECOVERY -> AuthPage.RESET_EMAIL
+            AuthPage.RESET_EMAIL -> AuthPage.LOGIN
+            else -> AuthPage.LANDING
+        })
     }
     when (state.page) {
         AuthPage.LANDING -> LandingScreen(
@@ -22,7 +26,7 @@ fun AuthEntry(flow: AuthFlowController, state: AuthFlowState) {
         AuthPage.LOGIN -> LoginScreen(
             onLoginClick = flow::login,
             onGoogleSignInClick = { flow.google { google.signIn() } },
-            onResetPasswordClick = flow::resetPassword,
+            onResetPasswordClick = { flow.navigate(AuthPage.RESET_EMAIL) },
             onNavigateToRegister = { flow.navigate(AuthPage.REGISTER) },
             onNavigateBack = { flow.navigate(AuthPage.LANDING) },
             errorMessage = state.error, infoMessage = state.info, isLoading = state.busy)
@@ -33,6 +37,14 @@ fun AuthEntry(flow: AuthFlowController, state: AuthFlowState) {
             onNavigateBack = { flow.navigate(AuthPage.LANDING) },
             errorMessage = state.error, isLoading = state.busy,
             passwordError = state.passwordError, onPasswordEdited = flow::clearPasswordError)
+        AuthPage.RECOVERY -> PasswordRecoveryScreen(state,
+            onSubmit = flow::recoverPassword,
+            onResend = flow::resetPassword,
+            onBack = { flow.navigate(AuthPage.LOGIN) },
+            onPasswordEdited = flow::clearPasswordError)
+        AuthPage.RESET_EMAIL -> PasswordResetEmailScreen(state,
+            onSend = flow::resetPassword,
+            onBack = { flow.navigate(AuthPage.LOGIN) })
         AuthPage.CONFIRM_EMAIL -> AuthStepLayout {
             Text("Check your email", style = MaterialTheme.typography.headlineLarge)
             Text("If registration can proceed for ${state.pendingEmail}, you will receive a confirmation email. Open its link to confirm your address, then return here and sign in to create your profile.")

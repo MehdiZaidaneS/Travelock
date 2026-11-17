@@ -33,6 +33,41 @@ import org.junit.Assert.*
 class AuthEntryTest {
     @get:Rule val compose = createComposeRule()
 
+    @Test fun forgotPasswordCompletesRecoveryAndReturnsToLogin() {
+        val gateway = FakeGateway().apply { current = ProfileOnboardingState.SignedOut }
+        compose.setContent {
+            val scope = rememberCoroutineScope()
+            val flow = remember { AuthFlowController(scope, gateway).apply { restore() } }
+            val state by flow.state.collectAsState()
+            MaterialTheme { AuthEntry(flow, state) }
+        }
+        compose.onNodeWithText("Log In", ignoreCase = true).performClick()
+        compose.onNodeWithText("Forgot Password?").performScrollTo().performClick()
+        compose.onNodeWithText("Forgot password").assertExists()
+        compose.onNodeWithText("Send recovery code").assertIsNotEnabled()
+        compose.onNodeWithText("New password").assertDoesNotExist()
+        compose.runOnIdle { assertEquals(0, gateway.resetRequests) }
+        saveScreenshot("reset-email")
+        compose.onNode(hasSetTextAction() and hasText("Email")).performTextInput("test@example.com")
+        compose.onNodeWithText("Send recovery code").performScrollTo().performClick()
+        compose.runOnIdle { assertEquals(1, gateway.resetRequests) }
+        compose.onNodeWithText("Reset your password").assertExists()
+        compose.onNode(hasSetTextAction() and hasText("Recovery code"))
+            .performScrollTo().performTextInput("123456")
+        compose.onNode(hasSetTextAction() and hasText("New password"))
+            .performScrollTo().performTextInput("Strong-pass9!")
+        compose.onNode(hasSetTextAction() and hasText("Confirm new password"))
+            .performScrollTo().performTextInput("mismatch")
+        compose.onNodeWithText("Update password").assertIsNotEnabled()
+        compose.onNode(hasSetTextAction() and hasText("Confirm new password"))
+            .performTextReplacement("Strong-pass9!")
+        compose.onNodeWithText("Reset your password").performScrollTo()
+        saveScreenshot("password-recovery")
+        compose.onNodeWithText("Update password").performScrollTo().performClick()
+        compose.onNodeWithText("Password updated. Sign in with your new password.").assertExists()
+        compose.onNodeWithText("Welcome Back").assertExists()
+    }
+
     @Test fun registrationOnlyAsksForCredentialsThenShowsConfirmation() {
         compose.setContent { MaterialTheme {
             RegisterScreen(onRegisterClick = { _, _, _ -> })
@@ -200,10 +235,11 @@ class AuthEntryTest {
     }
 
     private class FakeGateway : AuthFlowGateway {
+        var resetRequests = 0
         @Volatile var receivedPhoto: ByteArray? = null
         var receivedPreset: String? = null
         private val user = AuthUser("ui-test-account", "test@example.com")
-        private var current: ProfileOnboardingState = ProfileOnboardingState.NeedsProfile(user)
+        var current: ProfileOnboardingState = ProfileOnboardingState.NeedsProfile(user)
         override suspend fun state() = current
         override suspend fun register(email: String, password: String) { }
         override suspend fun login(email: String, password: String) { }
@@ -213,6 +249,9 @@ class AuthEntryTest {
             current = ProfileOnboardingState.Ready(user, Profile(user.userId, username, name, createdAt = Instant.EPOCH))
         }
         override suspend fun logout() { current = ProfileOnboardingState.SignedOut }
-        override suspend fun sendReset(email: String) { }
+        override suspend fun sendReset(email: String) { resetRequests++ }
+        override suspend fun recover(email: String, code: String, password: String) {
+            current = ProfileOnboardingState.SignedOut
+        }
     }
 }

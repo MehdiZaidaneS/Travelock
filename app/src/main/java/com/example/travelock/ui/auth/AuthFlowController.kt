@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-enum class AuthPage { CHECKING, LANDING, LOGIN, REGISTER, CONFIRM_EMAIL, PROFILE, READY, RETRY }
+enum class AuthPage { CHECKING, LANDING, LOGIN, REGISTER, CONFIRM_EMAIL, RESET_EMAIL, RECOVERY, PROFILE, READY, RETRY }
 
 data class AuthFlowState(
     val page: AuthPage = AuthPage.CHECKING,
@@ -34,6 +34,7 @@ interface AuthFlowGateway {
     suspend fun completeProfile(username: String, name: String, jpegBytes: ByteArray?, presetAvatar: String?)
     suspend fun logout()
     suspend fun sendReset(email: String)
+    suspend fun recover(email: String, code: String, password: String)
 }
 
 class SupabaseAuthFlowGateway : AuthFlowGateway {
@@ -61,6 +62,9 @@ class SupabaseAuthFlowGateway : AuthFlowGateway {
     }
     override suspend fun logout() { auth.logout(); pendingPhoto = null }
     override suspend fun sendReset(email: String) = auth.sendPasswordResetEmail(email)
+    override suspend fun recover(email: String, code: String, password: String) {
+        auth.resetPasswordFromCode(email, code, password)
+    }
 }
 
 class AuthFlowController(private val scope: CoroutineScope, private val gateway: AuthFlowGateway) {
@@ -69,9 +73,9 @@ class AuthFlowController(private val scope: CoroutineScope, private val gateway:
 
     fun navigate(page: AuthPage) {
         if (!state.value.busy && state.value.page in setOf(
-                AuthPage.LANDING, AuthPage.LOGIN, AuthPage.REGISTER, AuthPage.CONFIRM_EMAIL
-            ) && page in setOf(AuthPage.LANDING, AuthPage.LOGIN, AuthPage.REGISTER)) {
-            mutableState.value = state.value.copy(page = page, error = null, info = null)
+                AuthPage.LANDING, AuthPage.LOGIN, AuthPage.REGISTER, AuthPage.CONFIRM_EMAIL, AuthPage.RESET_EMAIL, AuthPage.RECOVERY
+            ) && page in setOf(AuthPage.LANDING, AuthPage.LOGIN, AuthPage.REGISTER, AuthPage.RESET_EMAIL)) {
+            mutableState.value = state.value.copy(page = page, error = null, info = null, passwordError = null)
         }
     }
 
@@ -150,7 +154,27 @@ class AuthFlowController(private val scope: CoroutineScope, private val gateway:
         }
         action("Unable to request a password reset. Check your email address and connection.") {
             gateway.sendReset(email.trim())
-            mutableState.value = state.value.copy(info = "If an account exists, check your email for a password reset link.")
+            mutableState.value = state.value.copy(page = AuthPage.RECOVERY, pendingEmail = email.trim(),
+                info = "If an account exists, check your email for a recovery code. Check your spam folder too.")
+        }
+    }
+
+    fun recoverPassword(email: String, code: String, password: String, confirmation: String) {
+        if (state.value.busy || state.value.page != AuthPage.RECOVERY) return
+        if (email.isBlank() || code.isBlank() || code.trim().any { it !in '0'..'9' } || password.isEmpty() || password != confirmation) {
+            mutableState.value = state.value.copy(error = if (password != confirmation)
+                "Passwords do not match." else "Enter your email, numeric recovery code and new password.")
+            return
+        }
+        val missing = RegistrationPasswordPolicy.missingRequirements(password)
+        if (missing.isNotEmpty()) {
+            mutableState.value = state.value.copy(passwordError = missing.joinToString(". ") + ".", error = null)
+            return
+        }
+        action("Unable to reset your password. Check the code. If it expired or was already used, request a new code. If an earlier attempt may have succeeded, try signing in with your new password.") {
+            gateway.recover(email.trim(), code.trim(), password)
+            mutableState.value = AuthFlowState(page = AuthPage.LOGIN, busy = true,
+                info = "Password updated. Sign in with your new password.")
         }
     }
 
@@ -184,7 +208,7 @@ class AuthFlowController(private val scope: CoroutineScope, private val gateway:
                     error is RestException && error.statusCode == 429 -> "Too many requests. Please wait before retrying."
                     else -> fallback
                 }
-                val weakPassword = state.value.page == AuthPage.REGISTER && (error is AuthWeakPasswordException ||
+                val weakPassword = state.value.page in setOf(AuthPage.REGISTER, AuthPage.RECOVERY) && (error is AuthWeakPasswordException ||
                     (error is AuthRestException && error.errorCode?.value == "weak_password"))
                 mutableState.value = state.value.copy(error = if (weakPassword) null else message,
                     passwordError = if (weakPassword) message else null)

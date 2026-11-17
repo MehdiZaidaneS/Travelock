@@ -21,6 +21,8 @@ class AuthFlowControllerTest {
         var created = 0
         var logins = 0
         var registrations = 0
+        var recovered: List<String>? = null
+        var recoveryFailure = false
         var photo: ByteArray? = null
         var preset: String? = null
         var loginWait: CompletableDeferred<Unit>? = null
@@ -39,6 +41,45 @@ class AuthFlowControllerTest {
         }
         override suspend fun logout() { current = ProfileOnboardingState.SignedOut }
         override suspend fun sendReset(email: String) { }
+        override suspend fun recover(email: String, code: String, password: String) {
+            if (recoveryFailure) error("private recovery token")
+            recovered = listOf(email, code, password)
+            current = ProfileOnboardingState.SignedOut
+        }
+    }
+
+    @Test fun recoveryValidatesBeforeConsumingCodeAndReturnsToSignIn() = runBlocking {
+        val gateway = Gateway()
+        val flow = AuthFlowController(this, gateway)
+        flow.restore(); yield()
+        flow.navigate(AuthPage.LOGIN)
+        flow.resetPassword(" test@example.com "); yield()
+        assertEquals(AuthPage.RECOVERY, flow.state.value.page)
+        flow.recoverPassword("test@example.com", "123456", "weak", "weak"); yield()
+        assertNull(gateway.recovered)
+        assertNotNull(flow.state.value.passwordError)
+        flow.recoverPassword("test@example.com", "123456", "Strong-pass9!", "different"); yield()
+        assertNull(gateway.recovered)
+        assertEquals("Passwords do not match.", flow.state.value.error)
+        flow.recoverPassword(" test@example.com ", " 123456 ", " Strong-pass9! ", " Strong-pass9! "); yield()
+        assertEquals(listOf("test@example.com", "123456", " Strong-pass9! "), gateway.recovered)
+        assertEquals(AuthPage.LOGIN, flow.state.value.page)
+        assertEquals(ProfileOnboardingState.SignedOut, flow.state.value.onboarding)
+        assertEquals("Password updated. Sign in with your new password.", flow.state.value.info)
+    }
+
+    @Test fun recoveryFailureStaysOnFormWithoutExposingSecrets() = runBlocking {
+        val gateway = Gateway().apply { recoveryFailure = true }
+        val flow = AuthFlowController(this, gateway)
+        flow.restore(); yield()
+        flow.resetPassword("test@example.com"); yield()
+        flow.recoverPassword("test@example.com", "654321", "Strong-pass9!", "Strong-pass9!"); yield()
+        assertEquals(AuthPage.RECOVERY, flow.state.value.page)
+        assertFalse(flow.state.value.busy)
+        assertFalse(flow.state.value.error!!.contains("private recovery token"))
+        assertTrue(flow.state.value.error!!.contains("request a new code"))
+        flow.navigate(AuthPage.LOGIN)
+        assertNull(flow.state.value.error)
     }
 
     @Test fun registrationWaitsForConfirmationWithoutCreatingProfile() = runBlocking {
