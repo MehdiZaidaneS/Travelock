@@ -53,8 +53,16 @@ fun MainScreen(
     exploreRepository.activeLocationIdFlow.collectAsState()*/
 
     // SEARCH LOCATIONS
-    LaunchedEffect(searchQuery) {
-        locations = locationRepository.searchLocations(searchQuery)
+    LaunchedEffect(searchQuery, currentLocation) {
+
+        val availableLocation =
+            currentLocation as? DeviceLocationResult.Available
+
+        locations = locationRepository.searchLocations(
+            query = searchQuery,
+            userLatitude = availableLocation?.latitude,
+            userLongitude = availableLocation?.longitude
+        )
     }
 
     // CHECK IF DESTINATION IS UNLOCKED
@@ -178,18 +186,6 @@ fun MainScreen(
                     style = MaterialTheme.typography.titleLarge
                 )
 
-                val availableLocation =
-                    currentLocation as? DeviceLocationResult.Available
-
-                Text(
-                    text = if (availableLocation != null) {
-                        "Latitude: ${availableLocation.latitude}\n" +
-                                "Longitude: ${availableLocation.longitude}"
-                    } else {
-                        "Location not available yet"
-                    }
-                )
-
                 Text(
                     text = if (searchQuery.isBlank()) {
                         "Discover new places around Helsinki"
@@ -219,9 +215,14 @@ fun MainScreen(
 
                 val isEnrolled = false
 
+                val availableLocation =
+                    currentLocation as? DeviceLocationResult.Available
+
                 LocationCard(
                     location = location,
                     isLocked = !isEnrolled,
+                    userLatitude = availableLocation?.latitude,
+                    userLongitude = availableLocation?.longitude,
                     onViewDetails = {
                         selectedLocation = location
                     }
