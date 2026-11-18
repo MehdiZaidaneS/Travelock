@@ -21,7 +21,7 @@ import com.example.travelock.ui.components.UserAvatarCircle
 import com.example.travelock.ui.viewmodel.FeedViewModel
 
 /**
- * Phase 4: Wire FeedScreen to FeedViewModel for live Supabase feed loading,
+ * Wire FeedScreen to FeedViewModel for live Supabase feed loading,
  * filter switching (Friends vs Public), live user search, and social actions.
  */
 @Composable
@@ -132,7 +132,6 @@ fun FeedScreen(
                 }
             }
         }
-
         // Feed Header & Posts
         item {
             Text(

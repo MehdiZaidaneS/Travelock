@@ -46,7 +46,6 @@ class FeedViewModel : ViewModel() {
         _uiState.update { it.copy(feedFilter = filter) }
         loadFeed()
     }
-
     fun onSearchQueryChange(query: String) {
         _uiState.update { it.copy(searchQuery = query) }
         if (query.isBlank()) {
@@ -102,7 +101,6 @@ class FeedViewModel : ViewModel() {
             }
         }
     }
-
     fun addComment(postId: String, content: String) {
         if (content.isBlank()) return
         viewModelScope.launch {
@@ -114,20 +112,20 @@ class FeedViewModel : ViewModel() {
             }
         }
     }
-    fun acceptFriendRequest(requestId: String) {
+    fun sendFriendRequest(targetUserId: String) {
         viewModelScope.launch {
             try {
-                friendshipRepo.acceptFriendRequest(requestId)
+                friendshipRepo.sendFriendRequest(targetUserId)
                 onSearchQueryChange(_uiState.value.searchQuery)
             } catch (e: Exception) {
                 _uiState.update { it.copy(errorMessage = e.localizedMessage) }
             }
         }
     }
-    fun sendFriendRequest(targetUserId: String) {
+    fun acceptFriendRequest(requestId: String) {
         viewModelScope.launch {
             try {
-                friendshipRepo.sendFriendRequest(targetUserId)
+                friendshipRepo.acceptFriendRequest(requestId)
                 onSearchQueryChange(_uiState.value.searchQuery)
             } catch (e: Exception) {
                 _uiState.update { it.copy(errorMessage = e.localizedMessage) }
