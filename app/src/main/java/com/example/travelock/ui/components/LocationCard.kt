@@ -25,12 +25,17 @@ import coil.compose.AsyncImage
 @Composable
 fun LocationCard(
     location: Location,
+    unlockedDestinationIds: Set<String>,
     isLocked: Boolean,
     onViewDetails: () -> Unit,
     userLatitude: Double?,
     userLongitude: Double?,
     modifier: Modifier = Modifier
 ) {
+
+    val unlockedCount = location.destinations.count { destination ->
+        destination.destinationId in unlockedDestinationIds
+    }
 
     // Calculate distance between user and location
     val distance = if (userLatitude != null && userLongitude != null) {
@@ -181,7 +186,7 @@ fun LocationCard(
                     }
 
                     Text(
-                        text = "0/${location.destinations.size} destinations unlocked",
+                        text = "${unlockedCount}/${location.destinations.size} destinations unlocked",
                         color = Color.White,
                         fontStyle = FontStyle.Italic,
                     )
