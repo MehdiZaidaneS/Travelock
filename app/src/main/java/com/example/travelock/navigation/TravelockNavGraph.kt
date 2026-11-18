@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalContext
@@ -15,7 +17,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
@@ -23,10 +24,12 @@ import com.example.travelock.data.mock.MockLocations
 import com.example.travelock.data.mock.MockSessionState
 import com.example.travelock.data.mock.MockUsers
 import com.example.travelock.ui.theme.ThemeMode
-import com.example.travelock.data.mock.repository.AuthRepository
-import com.example.travelock.ui.auth.LandingScreen
-import com.example.travelock.ui.auth.LoginScreen
-import com.example.travelock.ui.auth.RegisterScreen
+import com.example.travelock.ui.auth.AuthEntry
+import com.example.travelock.ui.auth.AuthPage
+import com.example.travelock.ui.viewmodel.AuthViewModel
+import com.example.travelock.data.model.ProfileOnboardingState
+import com.example.travelock.data.model.User
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.travelock.ui.components.BottomNavBar
 import com.example.travelock.ui.components.BottomNavTab
 import com.example.travelock.ui.components.TravelockTopAppBar
@@ -38,7 +41,6 @@ import com.example.travelock.ui.screens.profile.EditProfileScreen
 import com.example.travelock.ui.screens.profile.FriendProfileScreen
 import com.example.travelock.ui.screens.profile.ProfileScreen
 import com.example.travelock.ui.viewmodel.LocationViewModel
-import kotlinx.coroutines.launch
 
 /**
  * Root Navigation & Scaffold Shell for Travelock separating the Unauthenticated Flow
@@ -49,121 +51,37 @@ fun TravelockNavGraph(
     currentThemeMode: ThemeMode,
     onThemeModeChange: (ThemeMode) -> Unit,
     locationViewModel: LocationViewModel,
-    authRepository: AuthRepository = remember { AuthRepository() }
+    authViewModel: AuthViewModel = viewModel()
 ) {
-    val scope = rememberCoroutineScope()
-    val loggedInUser by authRepository.currentUserFlow.collectAsState()
+    val authState by authViewModel.flow.state.collectAsState()
+    val ready = authState.onboarding as? ProfileOnboardingState.Ready
+    val loggedInUser = ready?.user
+    val displayUser = ready?.let {
+        User(it.user.userId, it.profile.username, it.profile.name, it.user.email.orEmpty(),
+            it.profile.profileImage, it.profile.createdAt)
+    }
     val activeLocationId by MockSessionState.activeLocationId.collectAsState()
     val notifications by MockSessionState.notifications.collectAsState()
-
-    var authScreen by remember { mutableStateOf("landing") }
-    var authErrorMessage by remember { mutableStateOf<String?>(null) }
-    var authInfoMessage by remember { mutableStateOf<String?>(null) }
 
     var currentMainRoute by remember { mutableStateOf(BottomNavTab.HOME.route) }
     var selectedFriendId by remember { mutableStateOf<String?>(null) }
 
-    // ── Unauthenticated Flow (T-04, T-05) ──────────────────────────────────────
-    if (loggedInUser == null) {
-        when (authScreen) {
-            "landing" -> LandingScreen(
-                onNavigateToLogin = {
-                    authErrorMessage = null
-                    authInfoMessage = null
-                    authScreen = "login"
-                },
-                onNavigateToRegister = {
-                    authErrorMessage = null
-                    authInfoMessage = null
-                    authScreen = "register"
-                }
-            )
-
-            "login" -> LoginScreen(
-                onLoginClick = { email, password ->
-                    scope.launch {
-                        authRepository.loginWithEmail(email, password)
-                            .onSuccess {
-                                authErrorMessage = null
-                                currentMainRoute = BottomNavTab.HOME.route
-                            }
-                            .onFailure { authErrorMessage = it.message }
-                    }
-                },
-                onGoogleSignInClick = {
-                    scope.launch {
-                        authRepository.loginWithGoogle()
-                            .onSuccess {
-                                authErrorMessage = null
-                                currentMainRoute = BottomNavTab.HOME.route
-                            }
-                    }
-                },
-                onResetPasswordClick = { email ->
-                    scope.launch {
-                        authRepository.resetPassword(email)
-                            .onSuccess {
-                                authErrorMessage = null
-                                authInfoMessage = "Password reset link sent to $email"
-                            }
-                            .onFailure { authErrorMessage = it.message }
-                    }
-                },
-                onNavigateToRegister = {
-                    authErrorMessage = null
-                    authInfoMessage = null
-                    authScreen = "register"
-                },
-                onNavigateBack = {
-                    authErrorMessage = null
-                    authInfoMessage = null
-                    authScreen = "landing"
-                },
-                errorMessage = authErrorMessage,
-                infoMessage = authInfoMessage
-            )
-
-            "register" -> RegisterScreen(
-                onRegisterFullClick = { email, password, confirmPassword, username, fullName ->
-                    if (password != confirmPassword) {
-                        authErrorMessage = "Passwords do not match."
-                    } else {
-                        scope.launch {
-                            authRepository.registerWithEmail(email, password, username, fullName)
-                                .onSuccess {
-                                    authErrorMessage = null
-                                    currentMainRoute = BottomNavTab.HOME.route
-                                }
-                                .onFailure { authErrorMessage = it.message }
-                        }
-                    }
-                },
-                onGoogleSignInClick = {
-                    scope.launch {
-                        authRepository.loginWithGoogle()
-                            .onSuccess {
-                                authErrorMessage = null
-                                currentMainRoute = BottomNavTab.HOME.route
-                            }
-                    }
-                },
-                onNavigateToLogin = {
-                    authErrorMessage = null
-                    authInfoMessage = null
-                    authScreen = "login"
-                },
-                onNavigateBack = {
-                    authErrorMessage = null
-                    authInfoMessage = null
-                    authScreen = "landing"
-                },
-                errorMessage = authErrorMessage
-            )
-        }
+    if (authState.page != AuthPage.READY) {
+        AuthEntry(authViewModel.flow, authState)
         return
     }
 
+    LaunchedEffect(loggedInUser?.userId) {
+        currentMainRoute = BottomNavTab.HOME.route
+        selectedFriendId = null
+    }
+
     val context = LocalContext.current
+    val googleSignIn = remember(context) { com.example.travelock.ui.auth.GoogleAccountSignIn(context) }
+    val snackbarHost = remember { SnackbarHostState() }
+    LaunchedEffect(authState.error) {
+        authState.error?.let { snackbarHost.showSnackbar(it) }
+    }
 
     val currentLocation by
     locationViewModel.currentLocation.collectAsState()
@@ -219,6 +137,7 @@ fun TravelockNavGraph(
     val isSubScreen = currentMainRoute in listOf("notifications", "edit_profile", "friend_profile")
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHost) },
         topBar = {
             TravelockTopAppBar(
                 title = when (currentMainRoute) {
@@ -279,11 +198,10 @@ fun TravelockNavGraph(
                         selectedFriendId = friendId
                         currentMainRoute = "friend_profile"
                     },
+                    displayUser = displayUser,
+                    allowProfileEditing = false,
                     onLogoutClick = {
-                        scope.launch {
-                            authRepository.logout()
-                            authScreen = "landing"
-                        }
+                        authViewModel.flow.logout { googleSignIn.clearCredentialState() }
                     }
                 )
 

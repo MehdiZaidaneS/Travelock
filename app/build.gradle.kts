@@ -30,6 +30,7 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "SUPABASE_URL", localConfigString("SUPABASE_URL"))
         buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", localConfigString("SUPABASE_PUBLISHABLE_KEY"))
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", localConfigString("GOOGLE_WEB_CLIENT_ID"))
     }
 
     buildTypes {
@@ -79,8 +80,7 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
-    // Native account picker for the opt-in Google sign-in test; no release UI wiring.
-    debugImplementation(libs.androidx.credentials)
-    debugImplementation(libs.androidx.credentials.play.services.auth)
-    debugImplementation(libs.google.identity)
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services.auth)
+    implementation(libs.google.identity)
 }

@@ -2,7 +2,6 @@ package com.example.travelock.data.repository
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import com.example.travelock.BuildConfig
 import io.github.jan.supabase.auth.exception.AuthErrorCode
 import io.github.jan.supabase.auth.exception.AuthRestException
 import kotlinx.coroutines.runBlocking
@@ -16,7 +15,7 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class PasswordRecoveryManualTest {
     // Explicit opt-in: sends real email and permanently changes a TEST account's
-    // password. Keep links/passwords in local arguments, never in project files.
+    // password. Keep codes/passwords in local arguments, never in project files.
     @Test
     fun resetsThroughTheRecoveryEmailAndRejectsTheOldPassword() = runBlocking {
         val args = InstrumentationRegistry.getArguments()
@@ -45,8 +44,8 @@ class PasswordRecoveryManualTest {
                 val existing = repository.loginWithEmail(email, oldPassword)
                 // A recovery operation must not replace another active session.
                 try {
-                    repository.resetPasswordFromLink(email,
-                        "${BuildConfig.SUPABASE_URL.trimEnd('/')}/auth/v1/verify?token=unused-test-token&type=recovery",
+                    repository.resetPasswordFromCode(email,
+                        "123456",
                         oldPassword)
                     fail("Recovery replaced an active session.")
                 } catch (_: IllegalStateException) {
@@ -59,17 +58,17 @@ class PasswordRecoveryManualTest {
                 val newPassword = argument("supabaseRecoveryNewPassword")
                 require(newPassword != oldPassword) { "Choose a different new test password." }
                 if (stage == "verify") {
-                    // Use after an interrupted completion; this needs no email/link.
+                    // Use after an interrupted completion; this needs no email/code.
                     verifyChangedPassword(newPassword)
                 } else {
-                    val link = argument("supabaseRecoveryLink")
-                    val recovered = repository.resetPasswordFromLink(email, link, newPassword)
+                    val code = argument("supabaseRecoveryCode")
+                    val recovered = repository.resetPasswordFromCode(email, code, newPassword)
                     assertEquals(email.trim().lowercase(), recovered.email?.lowercase())
                     assertNull(repository.getCurrentUser())
                     verifyChangedPassword(newPassword, recovered.userId)
                     try {
-                        repository.resetPasswordFromLink(email, link, newPassword)
-                        fail("A consumed recovery link was accepted again.")
+                        repository.resetPasswordFromCode(email, code, newPassword)
+                        fail("A consumed recovery code was accepted again.")
                     } catch (error: AuthRestException) {
                         assertEquals(AuthErrorCode.OtpExpired, error.errorCode)
                         assertNull(repository.getCurrentUser())

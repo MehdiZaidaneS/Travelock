@@ -14,8 +14,8 @@ import kotlinx.serialization.json.put
 class ProfileRepository {
     private val supabase = SupabaseProvider.client
 
-    // Pass the uploaded Storage path, or "" to clear the picture. Other profile
-    // fields stay unchanged; the database validates ownership and the upload.
+    // Pass an uploaded Storage path, a supported preset avatar ID, or "" to clear.
+    // Other profile fields stay unchanged; the database validates the selection.
     suspend fun updateMyProfilePhoto(photoPath: String): Profile {
         supabase.auth.awaitInitialization()
         checkNotNull(supabase.auth.currentUserOrNull()) { "Sign in before saving a profile photo." }

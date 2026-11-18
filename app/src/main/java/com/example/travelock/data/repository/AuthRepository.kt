@@ -142,15 +142,36 @@ class AuthRepository {
         require(email.isNotBlank()) { "Email cannot be blank." }
         require(newPassword.isNotEmpty()) { "Password cannot be empty." }
         val tokenHash = PasswordRecoveryLinks.tokenHash(recoveryLink, BuildConfig.SUPABASE_URL)
+        return completePasswordRecovery(email, newPassword) {
+            supabase.auth.verifyEmailOtp(type = OtpType.Email.RECOVERY, tokenHash = tokenHash)
+        }
+    }
+
+    // The Reset Password email template must display {{ .Token }}.
+    suspend fun resetPasswordFromCode(email: String, code: String, newPassword: String): AuthUser {
+        require(email.isNotBlank()) { "Email cannot be blank." }
+        require(newPassword.isNotEmpty()) { "Password cannot be empty." }
+        val token = code.trim()
+        require(token.isNotEmpty() && token.all { it in '0'..'9' }) { "Enter the numeric recovery code." }
+        return completePasswordRecovery(email, newPassword) {
+            supabase.auth.verifyEmailOtp(type = OtpType.Email.RECOVERY, email = email.trim(), token = token)
+        }
+    }
+
+    private suspend fun completePasswordRecovery(
+        email: String,
+        newPassword: String,
+        verify: suspend () -> Unit,
+    ): AuthUser {
         supabase.auth.awaitInitialization()
         check(supabase.auth.currentSessionOrNull() == null) {
             "Sign out before recovering an account."
         }
         try {
-            supabase.auth.verifyEmailOtp(type = OtpType.Email.RECOVERY, tokenHash = tokenHash)
+            verify()
             val user = checkNotNull(supabase.auth.currentUserOrNull()) { "Recovery did not create a session." }
             require(user.email.equals(email.trim(), ignoreCase = true)) {
-                "The recovery link belongs to a different email address. Request a new link."
+                "Recovery belongs to a different email address. Request a new code."
             }
             // The server checks password strength. Never trim the password.
             supabase.auth.updateUser { password = newPassword }
