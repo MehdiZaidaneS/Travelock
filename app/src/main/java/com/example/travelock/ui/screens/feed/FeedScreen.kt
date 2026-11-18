@@ -1,81 +1,62 @@
 package com.example.travelock.ui.screens.feed
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.PersonAdd
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.travelock.data.mock.MockUsers
-import com.example.travelock.data.model.User
-import com.example.travelock.data.mock.repository.SocialRepository
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.travelock.ui.components.PostCard
 import com.example.travelock.ui.components.TravelockSearchBar
 import com.example.travelock.ui.components.UserAvatarCircle
-import kotlinx.coroutines.launch
+import com.example.travelock.ui.viewmodel.FeedViewModel
 
 /**
- * PBI-16, PBI-17, PBI-18, PBI-19: Friends Feed & User Search Screen (Steps 2–3 of Travelock.pdf).
- * - Displays chronological feed of friends' destination pictures with likes and comments.
- * - Includes user search bar to find travelers and send friend requests.
+ * Wire FeedScreen to FeedViewModel for live Supabase feed loading,
+ * filter switching (Friends vs Public), live user search, and social actions.
  */
 @Composable
 fun FeedScreen(
     currentUserId: String,
     onOpenUserProfile: (String) -> Unit,
-    socialRepository: SocialRepository = remember { SocialRepository() }
+    feedViewModel: FeedViewModel = viewModel()
 ) {
-    val scope = rememberCoroutineScope()
-    val posts by socialRepository.postsFlow.collectAsState()
-    val friends by socialRepository.friendsFlow.collectAsState()
-    val friendRequests by socialRepository.friendRequestsFlow.collectAsState()
-
-    var userSearchQuery by remember { mutableStateOf("") }
-    var searchedUsers by remember { mutableStateOf<List<User>>(emptyList()) }
-
-    LaunchedEffect(userSearchQuery) {
-        searchedUsers = if (userSearchQuery.isBlank()) {
-            // Show suggested travelers to connect with (Step 3 of Travelock.pdf)
-            listOf(MockUsers.sanna, MockUsers.mikko)
-        } else {
-            socialRepository.searchUsers(userSearchQuery)
-        }
-    }
+    val uiState by feedViewModel.uiState.collectAsState()
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // User Search Bar (PBI-17, Step 3)
+        // Filter Chips (Friends vs Public)
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FilterChip(
+                    selected = uiState.feedFilter == FeedFilter.FRIENDS,
+                    onClick = { feedViewModel.setFeedFilter(FeedFilter.FRIENDS) },
+                    label = { Text("Friends Feed") }
+                )
+                FilterChip(
+                    selected = uiState.feedFilter == FeedFilter.PUBLIC,
+                    onClick = { feedViewModel.setFeedFilter(FeedFilter.PUBLIC) },
+                    label = { Text("Public Explore") }
+                )
+            }
+        }
+
+        // User Search Bar & Section
         item {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
@@ -84,92 +65,77 @@ fun FeedScreen(
                     fontWeight = FontWeight.Bold
                 )
                 TravelockSearchBar(
-                    query = userSearchQuery,
-                    onQueryChange = { userSearchQuery = it },
+                    query = uiState.searchQuery,
+                    onQueryChange = { feedViewModel.onSearchQueryChange(it) },
                     placeholderText = "Search users by name or @username..."
                 )
             }
         }
 
-        // Matching / Suggested Users to Send Friend Requests
-        items(searchedUsers, key = { "user-${it.userId}" }) { user ->
-            val isAlreadyFriend = friends.any { it.userId == user.userId }
-            val hasPendingRequest = friendRequests.any {
-                ((it.senderId == currentUserId && it.receiverId == user.userId) ||
-                    (it.senderId == user.userId && it.receiverId == currentUserId)) &&
-                    it.status == "pending"
-            }
-
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onOpenUserProfile(user.userId) },
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
-            ) {
-                Row(
+        // Search Results List
+        if (uiState.searchResults.isNotEmpty()) {
+            items(uiState.searchResults, key = { "search-${it.profile.userId}" }) { result ->
+                val profile = result.profile
+                Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .clickable { onOpenUserProfile(profile.userId) },
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                 ) {
-                    UserAvatarCircle(name = user.name, username = user.username, size = 40.dp)
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = user.name,
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "@${user.username}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        UserAvatarCircle(name = profile.name, username = profile.username, size = 40.dp)
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = profile.name,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "@${profile.username}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
 
-                    when {
-                        isAlreadyFriend -> {
-                            OutlinedButton(onClick = { onOpenUserProfile(user.userId) }) {
-                                Icon(
-                                    imageVector = Icons.Default.Check,
-                                    contentDescription = null,
-                                    modifier = Modifier.padding(end = 4.dp)
-                                )
-                                Text("Friends")
-                            }
-                        }
-                        hasPendingRequest -> {
-                            OutlinedButton(onClick = {}, enabled = false) {
-                                Text("Requested")
-                            }
-                        }
-                        else -> {
-                            Button(
-                                onClick = {
-                                    scope.launch {
-                                        socialRepository.sendFriendRequest(user.userId)
-                                    }
+                        when (result.relationshipStatus) {
+                            RelationshipStatus.FRIENDS -> {
+                                OutlinedButton(onClick = { onOpenUserProfile(profile.userId) }) {
+                                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
+                                    Text("Friends")
                                 }
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.PersonAdd,
-                                    contentDescription = null,
-                                    modifier = Modifier.padding(end = 6.dp)
-                                )
-                                Text("Add Friend")
+                            }
+                            RelationshipStatus.OUTGOING_PENDING -> {
+                                OutlinedButton(onClick = {}, enabled = false) {
+                                    Icon(Icons.Default.HourglassEmpty, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
+                                    Text("Requested")
+                                }
+                            }
+                            RelationshipStatus.INCOMING_PENDING -> {
+                                Button(onClick = { result.incomingRequestId?.let { feedViewModel.acceptFriendRequest(it) } }) {
+                                    Text("Accept Request")
+                                }
+                            }
+                            RelationshipStatus.NONE -> {
+                                Button(onClick = { feedViewModel.sendFriendRequest(profile.userId) }) {
+                                    Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.padding(end = 6.dp))
+                                    Text("Add Friend")
+                                }
                             }
                         }
                     }
                 }
             }
         }
-
-        // Friends Feed Header (PBI-16, Step 2)
+        // Feed Header & Posts
         item {
             Text(
-                text = "Recent Friends Activity & Photos",
+                text = if (uiState.feedFilter == FeedFilter.FRIENDS) "Recent Friends Activity & Photos" else "Public Discovery Feed",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onBackground,
@@ -177,19 +143,36 @@ fun FeedScreen(
             )
         }
 
-        items(posts, key = { it.postId }) { post ->
-            PostCard(
-                post = post,
-                currentUserId = currentUserId,
-                onLikeToggle = {
-                    scope.launch { socialRepository.toggleLike(post.postId) }
-                },
-                onAddComment = { comment ->
-                    scope.launch { socialRepository.addComment(post.postId, comment) }
-                },
-                onAuthorClick = { userId -> onOpenUserProfile(userId) }
-            )
+        if (uiState.isLoading) {
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator()
+                }
+            }
+        } else if (uiState.posts.isEmpty()) {
+            item {
+                Text(
+                    text = "No posts found.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(vertical = 16.dp)
+                )
+            }
+        } else {
+            items(uiState.posts, key = { it.post.postId }) { feedPostItem ->
+                PostCard(
+                    feedPostItem = feedPostItem,
+                    currentUserId = currentUserId,
+                    onLikeToggle = { feedViewModel.toggleLike(feedPostItem.post.postId) },
+                    onAddComment = { content -> feedViewModel.addComment(feedPostItem.post.postId, content) },
+                    onAuthorClick = { userId -> onOpenUserProfile(userId) }
+                )
+            }
         }
     }
 }
-

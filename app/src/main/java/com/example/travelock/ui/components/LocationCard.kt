@@ -1,9 +1,12 @@
+
 package com.example.travelock.ui.components
 
+import android.location.Location as AndroidLocation
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material3.*
@@ -17,17 +20,48 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.travelock.data.model.Location
-import com.example.travelock.data.model.Destination
 import coil.compose.AsyncImage
-
 
 @Composable
 fun LocationCard(
     location: Location,
+    unlockedDestinationIds: Set<String>,
     isLocked: Boolean,
     onViewDetails: () -> Unit,
+    userLatitude: Double?,
+    userLongitude: Double?,
     modifier: Modifier = Modifier
-){
+) {
+
+    val unlockedCount = location.destinations.count { destination ->
+        destination.destinationId in unlockedDestinationIds
+    }
+
+    // Calculate distance between user and location
+    val distance = if (userLatitude != null && userLongitude != null) {
+
+        val results = FloatArray(1)
+
+        AndroidLocation.distanceBetween(
+            userLatitude,
+            userLongitude,
+            location.latitude,
+            location.longitude,
+            results
+        )
+
+        results[0]
+
+    } else {
+        null
+    }
+
+    // Format distance
+    val distanceText = when {
+        distance == null -> "Distance unavailable"
+        distance < 1000 -> "${distance.toInt()} m away"
+        else -> String.format("%.1f km away", distance / 1000)
+    }
 
     Card(
         onClick = onViewDetails,
@@ -124,8 +158,6 @@ fun LocationCard(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
 
-
-
                     Text(
                         text = location.name,
                         color = Color.White,
@@ -133,26 +165,33 @@ fun LocationCard(
                         fontWeight = FontWeight.Bold
                     )
 
-                    Text(
-                        text = "Distance: ~2 km",
-                        color = Color.White.copy(alpha = 0.85f),
-                        style = MaterialTheme.typography.bodyMedium
-                    )
+                    // Dynamic distance
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
 
-                    Row{
+                        Icon(
+                            imageVector = Icons.Default.LocationOn,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(18.dp)
+                        )
+
                         Text(
-                            text = "0/${location.destinations.size} destinations unlocked",
-                            color = Color.White,
-                            fontStyle = FontStyle.Italic,
+                            text = distanceText,
+                            color = Color.White.copy(alpha = 0.85f),
+                            style = MaterialTheme.typography.bodyMedium
                         )
                     }
 
-
+                    Text(
+                        text = "${unlockedCount}/${location.destinations.size} destinations unlocked",
+                        color = Color.White,
+                        fontStyle = FontStyle.Italic,
+                    )
                 }
             }
         }
     }
 }
-
-
-

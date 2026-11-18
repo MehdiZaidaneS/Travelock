@@ -32,4 +32,15 @@ class DestinationRepository {
             }
             .decodeList<Destination>()
     }
+
+    suspend fun getDestinationsWithDiscounts(): List<Destination> {
+        return supabase
+            .from("destinations")
+            .select {
+                filter {
+                    gt("discount", 0)
+                }
+            }
+            .decodeList<Destination>()
+    }
 }

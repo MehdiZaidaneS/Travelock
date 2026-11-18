@@ -25,10 +25,17 @@ import coil.compose.AsyncImage
 fun ExtendedLocationCard(
     location: Location,
     isLocked: Boolean,
+    unlockedDestinationIds: Set<String>,
     onBack: () -> Unit,
     onDestinationSelected: (Destination) -> Unit,
     modifier: Modifier = Modifier
 ) {
+
+    val unlockedCount = location.destinations.count { destination ->
+        destination.destinationId in unlockedDestinationIds
+    }
+
+    val totalCount = location.destinations.size
 
     LazyColumn(
         modifier = modifier
@@ -127,10 +134,7 @@ fun ExtendedLocationCard(
                     )
 
                     Text(
-                        text = if (isLocked)
-                            "${location.destinations.size}/3 destinations to unlock..."
-                        else
-                            "Keep discovering ${location.name}",
+                        text = "$unlockedCount/$totalCount destinations unlocked",
                         fontWeight = FontWeight.SemiBold
                     )
                 }
@@ -149,7 +153,7 @@ fun ExtendedLocationCard(
 
                     DestinationCard(
                         destination = destination,
-                        isLocked = true,
+                        isLocked = destination.destinationId !in unlockedDestinationIds,
                         onClick = {
                             onDestinationSelected(destination)
                         }
