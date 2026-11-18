@@ -34,10 +34,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.travelock.data.model.User
 import com.example.travelock.ui.components.AchievementBadgeCard
 import com.example.travelock.ui.components.ProfilePhotoAvatar
 import com.example.travelock.ui.components.ThemeSwitcher
 import com.example.travelock.ui.theme.ThemeMode
+import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
@@ -369,7 +371,17 @@ fun ProfileScreen(
                 }
             }
         } else {
-            items(uiState.friends, key = { "friend-${it.userId}" }) { friend ->
+            items(uiState.friends, key = { "friend-${it.friendshipId}" }) { friend ->
+                val friendName = friend.profile?.name?.ifBlank { null } ?: "Travelock Traveler"
+                val friendUsername = friend.profile?.username?.ifBlank { null } ?: "traveler"
+                val friendUser = User(
+                    userId = friend.userId,
+                    username = friendUsername,
+                    name = friendName,
+                    email = "",
+                    profileImage = friend.profile?.profileImage.orEmpty(),
+                    createdAt = Instant.EPOCH,
+                )
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -384,16 +396,16 @@ fun ProfileScreen(
                             .padding(14.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        ProfilePhotoAvatar(user = friend.toUser(), size = 44.dp)
+                        ProfilePhotoAvatar(user = friendUser, size = 44.dp)
                         Spacer(modifier = Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = friend.name,
+                                text = friendName,
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "@${friend.username}",
+                                text = "@$friendUsername",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )

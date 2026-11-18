@@ -1,6 +1,6 @@
 package com.example.travelock.ui.screens.profile
 
-import com.example.travelock.data.model.FriendProfile
+import com.example.travelock.data.model.FriendListItem
 import com.example.travelock.data.model.Location
 import com.example.travelock.data.model.User
 import com.example.travelock.data.model.UserAchievement
@@ -19,7 +19,7 @@ data class ProfileUiState(
     val unlocks: List<UserUnlock> = emptyList(),
     val achievements: List<UserAchievement> = emptyList(),
     val allLocations: List<Location> = emptyList(),
-    val friends: List<FriendProfile> = emptyList(),
+    val friends: List<FriendListItem> = emptyList(),
     val errorMessage: String? = null,
 ) {
     fun toDisplayUser(): User = User(

@@ -1,15 +1,12 @@
 package com.example.travelock.data.repository
 
-import com.example.travelock.data.SupabaseProvider
-import com.example.travelock.data.model.FriendProfile
+import com.example.travelock.data.model.FriendListItem
 import com.example.travelock.data.model.Location
 import com.example.travelock.data.model.Profile
 import com.example.travelock.data.model.UserAchievement
 import com.example.travelock.data.model.UserUnlock
 import com.example.travelock.ui.auth.ProfileAvatarPresets
 import io.github.jan.supabase.postgrest.exception.PostgrestRestException
-import io.github.jan.supabase.postgrest.from
-import java.time.Instant
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -23,7 +20,7 @@ data class ProfileBundle(
     val unlocks: List<UserUnlock>,
     val achievements: List<UserAchievement>,
     val allLocations: List<Location>,
-    val friends: List<FriendProfile>,
+    val friends: List<FriendListItem>,
 )
 
 /**
@@ -38,10 +35,8 @@ class ProfileDetailsRepository(
     private val friendshipRepository: FriendshipRepository = FriendshipRepository(),
     private val locationRepository: LocationRepository = LocationRepository(),
     private val destinationRepository: DestinationRepository = DestinationRepository(),
-    private val userAchievementRepository: UserAchievementRepository = UserAchievementRepository(),
+    private val achievementRepository: AchievementRepository = AchievementRepository(),
 ) {
-    private val supabase = SupabaseProvider.client
-
     private data class PendingPhoto(val userId: String, val bytes: ByteArray, val path: String)
     private var pendingPhoto: PendingPhoto? = null
 
@@ -65,78 +60,22 @@ class ProfileDetailsRepository(
         val unlocksDeferred = async {
             safeCall(emptyList()) { userUnlockRepository.getMyUnlocksWithDestinations() }
         }
-        val dbAchievementsDeferred = async {
-            userAchievementRepository.getMyAchievements()
+        val achievementsDeferred = async {
+            safeCall(Unit) { achievementRepository.refreshMyAchievements() }
+            safeCall(emptyList()) { achievementRepository.getMyAchievements() }
         }
         val friendsDeferred = async {
-            loadFriends(authUser.userId)
-        }
-
-        val allLocations = locationsDeferred.await()
-        val unlocks = unlocksDeferred.await()
-        val dbAchievements = dbAchievementsDeferred.await()
-        val friends = friendsDeferred.await()
-
-        val unlockedDestIds = unlocks.map { it.destinationId }.toSet()
-        val dbByLocationId = dbAchievements.associateBy { it.location.locationId }
-        val mergedAchievements = buildList {
-            addAll(dbAchievements)
-            allLocations.forEach { loc ->
-                if (loc.locationId !in dbByLocationId &&
-                    loc.destinations.isNotEmpty() &&
-                    loc.destinations.all { it.destinationId in unlockedDestIds }
-                ) {
-                    val latestUnlockTime = unlocks
-                        .filter { u -> loc.destinations.any { it.destinationId == u.destinationId } }
-                        .maxOfOrNull { it.unlockedAt } ?: Instant.now()
-                    add(
-                        UserAchievement(
-                            achievementId = "derived-${loc.locationId}",
-                            userId = authUser.userId,
-                            location = loc,
-                            level = 1,
-                            unlockedAt = latestUnlockTime,
-                        )
-                    )
-                }
-            }
+            safeCall(emptyList()) { friendshipRepository.getMyFriends() }
         }
 
         ProfileBundle(
             profile = profile,
             email = authUser.email.orEmpty(),
-            unlocks = unlocks,
-            achievements = mergedAchievements,
-            allLocations = allLocations,
-            friends = friends,
+            unlocks = unlocksDeferred.await(),
+            achievements = achievementsDeferred.await(),
+            allLocations = locationsDeferred.await(),
+            friends = friendsDeferred.await(),
         )
-    }
-
-    private suspend fun loadFriends(currentUserId: String): List<FriendProfile> {
-        val friendships = safeCall(emptyList()) { friendshipRepository.getMyFriendships() }
-        val friendIds = friendships.map { f ->
-            if (f.requesterId == currentUserId) f.recipientId else f.requesterId
-        }.distinct()
-        if (friendIds.isEmpty()) return emptyList()
-
-        val fetchedProfiles = safeCall(emptyList()) {
-            supabase.from("profiles")
-                .select {
-                    filter {
-                        isIn("user_id", friendIds)
-                    }
-                }
-                .decodeList<FriendProfile>()
-        }.associateBy { it.userId }
-
-        return friendIds.map { id ->
-            fetchedProfiles[id] ?: FriendProfile(
-                userId = id,
-                username = "traveler_${id.take(6)}",
-                name = "Travelock Traveler",
-                profileImage = "",
-            )
-        }
     }
 
     /**
