@@ -17,6 +17,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
@@ -41,6 +42,8 @@ import com.example.travelock.ui.screens.profile.EditProfileScreen
 import com.example.travelock.ui.screens.profile.FriendProfileScreen
 import com.example.travelock.ui.screens.profile.ProfileScreen
 import com.example.travelock.ui.viewmodel.LocationViewModel
+import com.example.travelock.ui.viewmodel.ProfileViewModel
+import kotlinx.coroutines.launch
 
 /**
  * Root Navigation & Scaffold Shell for Travelock separating the Unauthenticated Flow
@@ -51,7 +54,8 @@ fun TravelockNavGraph(
     currentThemeMode: ThemeMode,
     onThemeModeChange: (ThemeMode) -> Unit,
     locationViewModel: LocationViewModel,
-    authViewModel: AuthViewModel = viewModel()
+    authViewModel: AuthViewModel = viewModel(),
+    profileViewModel: ProfileViewModel = viewModel()
 ) {
     val authState by authViewModel.flow.state.collectAsState()
     val ready = authState.onboarding as? ProfileOnboardingState.Ready
@@ -66,6 +70,10 @@ fun TravelockNavGraph(
     var currentMainRoute by remember { mutableStateOf(BottomNavTab.HOME.route) }
     var selectedFriendId by remember { mutableStateOf<String?>(null) }
 
+    LaunchedEffect(loggedInUser?.userId, displayUser) {
+        profileViewModel.syncWithAuthUser(displayUser)
+    }
+
     if (authState.page != AuthPage.READY) {
         AuthEntry(authViewModel.flow, authState)
         return
@@ -75,6 +83,10 @@ fun TravelockNavGraph(
         currentMainRoute = BottomNavTab.HOME.route
         selectedFriendId = null
     }
+
+    val scope = rememberCoroutineScope()
+    val profileUiState by profileViewModel.uiState.collectAsState()
+    val editProfileUiState by profileViewModel.editState.collectAsState()
 
     val context = LocalContext.current
     val googleSignIn = remember(context) { com.example.travelock.ui.auth.GoogleAccountSignIn(context) }
@@ -162,7 +174,12 @@ fun TravelockNavGraph(
         bottomBar = {
             BottomNavBar(
                 currentRoute = currentMainRoute,
-                onTabSelected = { tab -> currentMainRoute = tab.route }
+                onTabSelected = { tab ->
+                    currentMainRoute = tab.route
+                    if (tab == BottomNavTab.PROFILE) {
+                        profileViewModel.loadProfile(forceRefresh = true)
+                    }
+                }
             )
         }
     ) { innerPadding ->
@@ -191,22 +208,39 @@ fun TravelockNavGraph(
                 BottomNavTab.MAP.route -> MapScreen()
 
                 BottomNavTab.PROFILE.route -> ProfileScreen(
+                    uiState = profileUiState,
                     currentThemeMode = currentThemeMode,
                     onThemeModeChange = onThemeModeChange,
-                    onEditProfileClick = { currentMainRoute = "edit_profile" },
+                    onEditProfileClick = {
+                        profileViewModel.startEditing()
+                        currentMainRoute = "edit_profile"
+                    },
                     onFriendClick = { friendId ->
                         selectedFriendId = friendId
                         currentMainRoute = "friend_profile"
                     },
-                    displayUser = displayUser,
-                    allowProfileEditing = false,
                     onLogoutClick = {
+                        profileViewModel.syncWithAuthUser(null)
                         authViewModel.flow.logout { googleSignIn.clearCredentialState() }
-                    }
+                    },
+                    onRefresh = { profileViewModel.loadProfile(forceRefresh = true) },
+                    allowProfileEditing = true
                 )
 
                 "edit_profile" -> EditProfileScreen(
-                    onSaved = { currentMainRoute = BottomNavTab.PROFILE.route },
+                    editState = editProfileUiState,
+                    currentUser = profileUiState.toDisplayUser(),
+                    onUsernameChange = profileViewModel::onUsernameChange,
+                    onFullNameChange = profileViewModel::onFullNameChange,
+                    onImageChange = profileViewModel::onImageChange,
+                    onSave = {
+                        profileViewModel.saveProfile(context) {
+                            currentMainRoute = BottomNavTab.PROFILE.route
+                            scope.launch {
+                                snackbarHost.showSnackbar("Profile updated")
+                            }
+                        }
+                    },
                     onCancel = { currentMainRoute = BottomNavTab.PROFILE.route }
                 )
 

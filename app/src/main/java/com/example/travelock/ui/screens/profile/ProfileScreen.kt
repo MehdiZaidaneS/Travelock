@@ -16,59 +16,64 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.travelock.data.mock.MockLocations
-import com.example.travelock.data.mock.MockUsers
-import com.example.travelock.ui.theme.ThemeMode
-import com.example.travelock.data.mock.repository.UserRepository
 import com.example.travelock.ui.components.AchievementBadgeCard
-import com.example.travelock.ui.components.ThemeSwitcher
-import com.example.travelock.ui.components.UserAvatarCircle
 import com.example.travelock.ui.components.ProfilePhotoAvatar
+import com.example.travelock.ui.components.ThemeSwitcher
+import com.example.travelock.ui.theme.ThemeMode
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 /**
- * PBI-26 to PBI-30: Personal User Profile Screen (Steps 4, 21, 23 of Travelock.pdf).
- * Displays user info, exploration stats, Achievements (unlocked vs locked), Friends list,
- * App Theme Switcher (System / Light / Dark), Edit Profile button, and Logout button.
+ * PBI-26 to PBI-30: Personal User Profile Screen backed by live Supabase state.
+ * Displays user info, exploration stats, Achievements (unlocked vs locked),
+ * Unlocked Destinations, Friends list, App Theme Switcher, Edit Profile button, and Logout button.
  */
 @Composable
 fun ProfileScreen(
+    uiState: ProfileUiState,
     currentThemeMode: ThemeMode,
     onThemeModeChange: (ThemeMode) -> Unit,
     onEditProfileClick: () -> Unit,
     onFriendClick: (String) -> Unit,
     onLogoutClick: () -> Unit,
-    userRepository: UserRepository = remember { UserRepository() },
-    displayUser: com.example.travelock.data.model.User? = null,
-    allowProfileEditing: Boolean = true
+    onRefresh: () -> Unit = {},
+    allowProfileEditing: Boolean = true,
 ) {
-    val currentUser by userRepository.currentUserFlow.collectAsState()
-    val user = displayUser ?: currentUser ?: MockUsers.currentUser
-    val achievements by userRepository.achievementsFlow.collectAsState()
-    val unlocks by userRepository.unlocksFlow.collectAsState()
-    val friends by userRepository.friendsFlow.collectAsState()
+    val user = remember(uiState.userId, uiState.username, uiState.name, uiState.email, uiState.profileImage, uiState.createdAt) {
+        uiState.toDisplayUser()
+    }
+    val allDestinations = remember(uiState.allLocations) {
+        uiState.allLocations.flatMap { it.destinations }
+    }
+    val joinedText = remember(uiState.createdAt) {
+        val formatter = DateTimeFormatter.ofPattern("MMM yyyy").withZone(ZoneId.systemDefault())
+        "Joined ${formatter.format(uiState.createdAt)}"
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // User Header Card
+        // User Header Card (PBI-26)
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -83,21 +88,46 @@ fun ProfileScreen(
                         .padding(20.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    if (displayUser != null) ProfilePhotoAvatar(user, 80.dp)
-                    else UserAvatarCircle(
-                        name = user.name,
-                        username = user.username,
-                        size = 80.dp
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        IconButton(
+                            onClick = onRefresh,
+                            enabled = !uiState.isLoading && !uiState.isRefreshing
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = "Refresh profile"
+                            )
+                        }
+                    }
+
+                    ProfilePhotoAvatar(user = user, size = 80.dp)
+
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = user.name,
+                        text = uiState.name.ifBlank { "Travelock Traveler" },
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Bold
                     )
+                    val subtitle = buildString {
+                        if (uiState.username.isNotBlank()) append("@${uiState.username}")
+                        if (uiState.email.isNotBlank()) {
+                            if (isNotEmpty()) append(" • ")
+                            append(uiState.email)
+                        }
+                    }
+                    if (subtitle.isNotBlank()) {
+                        Text(
+                            text = subtitle,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                     Text(
-                        text = "@${user.username} • ${user.email}",
-                        style = MaterialTheme.typography.bodyMedium,
+                        text = joinedText,
+                        style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
@@ -108,9 +138,9 @@ fun ProfileScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
-                        ProfileStatColumn(count = unlocks.size, label = "Unlocked")
-                        ProfileStatColumn(count = achievements.size, label = "Achievements")
-                        ProfileStatColumn(count = friends.size, label = "Friends")
+                        ProfileStatColumn(count = uiState.unlocks.size, label = "Unlocked")
+                        ProfileStatColumn(count = uiState.achievements.size, label = "Achievements")
+                        ProfileStatColumn(count = uiState.friends.size, label = "Friends")
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
@@ -121,7 +151,7 @@ fun ProfileScreen(
                     ) {
                         OutlinedButton(
                             onClick = onEditProfileClick,
-                            enabled = allowProfileEditing,
+                            enabled = allowProfileEditing && !uiState.isLoading,
                             modifier = Modifier.weight(1f)
                         ) {
                             Icon(
@@ -146,6 +176,57 @@ fun ProfileScreen(
                                 modifier = Modifier.padding(end = 6.dp)
                             )
                             Text("Log Out")
+                        }
+                    }
+                }
+            }
+        }
+
+        // Loading / Error Banner
+        if (uiState.isLoading) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator()
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text("Loading profile from Supabase…")
+                    }
+                }
+            }
+        } else if (!uiState.errorMessage.isNullOrBlank()) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = uiState.errorMessage,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.weight(1f)
+                        )
+                        TextButton(onClick = onRefresh) {
+                            Text("Retry")
                         }
                     }
                 }
@@ -179,56 +260,85 @@ fun ProfileScreen(
         // Achievements Section (PBI-27)
         item {
             Text(
-                text = "Achievements (${achievements.size}/${MockLocations.allLocations.size})",
+                text = "Achievements (${uiState.achievements.size}/${uiState.allLocations.size})",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
         }
 
-        items(MockLocations.allLocations, key = { "ach-${it.locationId}" }) { location ->
-            val unlocked = achievements.any { it.location.locationId == location.locationId }
-            AchievementBadgeCard(
-                location = location,
-                isUnlocked = unlocked
-            )
+        if (uiState.allLocations.isEmpty() && !uiState.isLoading) {
+            item {
+                Text(
+                    text = "No locations available yet.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        } else {
+            items(uiState.allLocations, key = { "ach-${it.locationId}" }) { location ->
+                val unlocked = uiState.achievements.any { it.location.locationId == location.locationId }
+                AchievementBadgeCard(
+                    location = location,
+                    isUnlocked = unlocked
+                )
+            }
         }
 
         // Unlocked Destinations Section (PBI-26)
         item {
             Text(
-                text = "Unlocked Destinations (${unlocks.size})",
+                text = "Unlocked Destinations (${uiState.unlocks.size})",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
         }
 
-        items(unlocks, key = { it.unlockId }) { unlock ->
-            val destName = unlock.destination?.name
-                ?: MockLocations.allDestinations.find { it.destinationId == unlock.destinationId }?.name
-                ?: unlock.destinationId
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+        if (uiState.unlocks.isEmpty() && !uiState.isLoading) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
                 ) {
                     Text(
-                        text = "✅ $destName",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
+                        text = "You haven't unlocked any destinations yet. Explore a location to unlock places!",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(14.dp)
                     )
-                    Text(
-                        text = "Visited",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary
+                }
+            }
+        } else {
+            items(uiState.unlocks, key = { it.unlockId }) { unlock ->
+                val destName = unlock.destination?.name
+                    ?: allDestinations.find { it.destinationId == unlock.destinationId }?.name
+                    ?: unlock.destinationId
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
                     )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "✅ $destName",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Text(
+                            text = "Visited",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
             }
         }
@@ -236,46 +346,64 @@ fun ProfileScreen(
         // Friends List Section (PBI-28)
         item {
             Text(
-                text = "Friends (${friends.size})",
+                text = "Friends (${uiState.friends.size})",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
         }
 
-        items(friends, key = { "friend-${it.userId}" }) { friend ->
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onFriendClick(friend.userId) },
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
-            ) {
-                Row(
+        if (uiState.friends.isEmpty() && !uiState.isLoading) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
+                ) {
+                    Text(
+                        text = "No accepted friends yet. Search for travelers in the Feed tab to connect!",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(14.dp)
+                    )
+                }
+            }
+        } else {
+            items(uiState.friends, key = { "friend-${it.userId}" }) { friend ->
+                Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .clickable { onFriendClick(friend.userId) },
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
                 ) {
-                    UserAvatarCircle(name = friend.name, username = friend.username, size = 44.dp)
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        ProfilePhotoAvatar(user = friend.toUser(), size = 44.dp)
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = friend.name,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "@${friend.username}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                         Text(
-                            text = friend.name,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "@${friend.username} • ${friend.achievements.size} achievements",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            text = "View Profile",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary
                         )
                     }
-                    Text(
-                        text = "View Profile",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary
-                    )
                 }
             }
         }
@@ -298,4 +426,3 @@ private fun ProfileStatColumn(count: Int, label: String) {
         )
     }
 }
-
