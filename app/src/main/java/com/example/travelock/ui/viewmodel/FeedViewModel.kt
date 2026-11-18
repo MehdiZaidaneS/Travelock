@@ -114,7 +114,16 @@ class FeedViewModel : ViewModel() {
             }
         }
     }
-
+    fun acceptFriendRequest(requestId: String) {
+        viewModelScope.launch {
+            try {
+                friendshipRepo.acceptFriendRequest(requestId)
+                onSearchQueryChange(_uiState.value.searchQuery)
+            } catch (e: Exception) {
+                _uiState.update { it.copy(errorMessage = e.localizedMessage) }
+            }
+        }
+    }
     fun sendFriendRequest(targetUserId: String) {
         viewModelScope.launch {
             try {
