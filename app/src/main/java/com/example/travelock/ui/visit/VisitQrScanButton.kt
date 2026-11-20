@@ -61,6 +61,7 @@ fun VisitQrScanButton(
             }
         },
         modifier = modifier,
+        colors = visitButtonColors(),
         enabled = enabled && !scanning,
     ) {
         Text(stringResource(if (scanning) R.string.visit_qr_scanning else R.string.visit_qr_scan))
@@ -68,7 +69,7 @@ fun VisitQrScanButton(
 }
 
 @Composable
-private fun rememberQrCodeScanner(): QrCodeScanner {
+internal fun rememberQrCodeScanner(): QrCodeScanner {
     val context = LocalContext.current
     return remember(context) { GoogleQrCodeScanner(context) }
 }

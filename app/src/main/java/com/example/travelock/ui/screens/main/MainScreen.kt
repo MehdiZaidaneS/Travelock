@@ -14,15 +14,16 @@ import com.example.travelock.data.model.Location
 import com.example.travelock.data.model.Destination
 import com.example.travelock.data.repository.LocationRepository
 import com.example.travelock.data.repository.UserUnlockRepository
+import com.example.travelock.data.repository.UserEnrolmentRepository
 import com.example.travelock.data.location.DeviceLocationResult
 import com.example.travelock.data.repository.DestinationRepository
 import com.example.travelock.ui.components.DestinationCard
 import com.example.travelock.ui.components.DiscountCard
 
-import com.example.travelock.ui.components.ExtendedDestinationCard
 import com.example.travelock.ui.components.ExtendedLocationCard
 import com.example.travelock.ui.components.LocationCard
 import com.example.travelock.ui.components.TravelockSearchBar
+import com.example.travelock.ui.visit.VisitFlowActions
 
 
 @Composable
@@ -30,11 +31,12 @@ fun MainScreen(
     locationRepository: LocationRepository = remember { LocationRepository() },
     unlockRepository: UserUnlockRepository = remember { UserUnlockRepository() },
     destinationRepository: DestinationRepository = remember { DestinationRepository() },
-    onUnlockQr: (Destination) -> Unit = {},
-    onUnlockCamera: (Destination) -> Unit = {},
+    enrolmentRepository: UserEnrolmentRepository = remember { UserEnrolmentRepository() },
+    visitActions: VisitFlowActions? = null,
     modifier: Modifier = Modifier,
     currentLocation: DeviceLocationResult?
 ) {
+    val unlockRevision = visitActions?.revision ?: 0
     var searchQuery by remember { mutableStateOf("") }
 
     var locations by remember {
@@ -49,10 +51,6 @@ fun MainScreen(
         mutableStateOf<Location?>(null)
     }
 
-    var selectedDestination by remember {
-        mutableStateOf<Destination?>(null)
-    }
-
     var unlockedDestinationIds by remember {
         mutableStateOf<Set<String>>(emptySet())
     }
@@ -64,13 +62,26 @@ fun MainScreen(
     var unlockError by remember {
         mutableStateOf<String?>(null)
     }
+    var enrolledDestinations by remember { mutableStateOf<List<Destination>>(emptyList()) }
+    var enrolmentError by remember { mutableStateOf<String?>(null) }
+    var enrolmentRetry by remember { mutableStateOf(0) }
+    LaunchedEffect(enrolmentRepository, unlockRevision, enrolmentRetry) {
+        try {
+            enrolmentError = null
+            enrolledDestinations = enrolmentRepository.getMyEnrolmentsWithDestinations().mapNotNull { it.destination }
+        } catch (error: kotlinx.coroutines.CancellationException) {
+            throw error
+        } catch (_: Exception) {
+            enrolmentError = "Could not load your enrolled destinations."
+        }
+    }
 
     // CURRENT DEVICE LOCATION
     val availableLocation =
         currentLocation as? DeviceLocationResult.Available
 
     // GET USER UNLOCKS
-    LaunchedEffect(unlockRepository) {
+    LaunchedEffect(unlockRepository, unlockRevision) {
         try {
             isLoadingUnlocks = true
             unlockError = null
@@ -125,27 +136,6 @@ fun MainScreen(
         return destinationId in unlockedDestinationIds
     }
 
-    // EXTENDED DESTINATION SCREEN
-    if (selectedDestination != null) {
-        val destination = selectedDestination!!
-
-        ExtendedDestinationCard(
-            destination = destination,
-            isLocked = !isUnlocked(destination.destinationId),
-            onBack = {
-                selectedDestination = null
-            },
-            onUnlockQr = {
-                onUnlockQr(destination)
-            },
-            onUnlockCamera = {
-                onUnlockCamera(destination)
-            }
-        )
-
-        return
-    }
-
     // EXTENDED LOCATION SCREEN
     if (selectedLocation != null) {
         val location = selectedLocation!!
@@ -164,7 +154,7 @@ fun MainScreen(
                 selectedLocation = null
             },
             onDestinationSelected = { destination ->
-                selectedDestination = destination
+                visitActions?.onOpenDestination?.invoke(destination, isUnlocked(destination.destinationId))
             },
             modifier = modifier
         )
@@ -194,6 +184,22 @@ fun MainScreen(
 
 
         if (searchQuery.isBlank()){
+            item {
+                Text("Your visits", style = MaterialTheme.typography.titleLarge)
+            }
+            enrolmentError?.let { message ->
+                item {
+                    Text(message, color = MaterialTheme.colorScheme.error)
+                    TextButton(onClick = { enrolmentRetry++ }) { Text("Retry") }
+                }
+            }
+            val pendingDestinations = enrolledDestinations.filter { it.destinationId !in unlockedDestinationIds }
+            if (pendingDestinations.isEmpty() && enrolmentError == null) {
+                item { Text("Enroll in a destination to plan your next visit.") }
+            }
+            items(pendingDestinations, key = { "enrolled_${it.destinationId}" }) { destination ->
+                DestinationCard(destination, isLocked = true, onClick = { visitActions?.onOpenDestination?.invoke(destination, isUnlocked(destination.destinationId)) })
+            }
             // PROMOTIONS HEADER
             item {
                 Column(
@@ -233,7 +239,7 @@ fun MainScreen(
                                 destination = destination,
                                 isLocked = true,
                                 onClick = {
-                                    selectedDestination = destination
+                                    visitActions?.onOpenDestination?.invoke(destination, isUnlocked(destination.destinationId))
                                 },
                                 modifier = Modifier.width(280.dp)
                             )

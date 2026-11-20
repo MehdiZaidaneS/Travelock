@@ -10,7 +10,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddRoad
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ClearAll
-import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Route
@@ -28,16 +27,14 @@ import com.example.travelock.data.mock.MockLocations
 import com.example.travelock.data.mock.MockSessionState
 import com.example.travelock.data.mock.repository.ExploreRepository
 import com.example.travelock.data.model.Destination
-import com.example.travelock.data.model.UserAchievement
-import com.example.travelock.ui.components.ExtendedDestinationCard
+import com.example.travelock.ui.visit.VisitFlowActions
 import com.example.travelock.util.DistanceCalculator
-import kotlinx.coroutines.launch
 
 @Composable
 fun MapScreen(
-    exploreRepository: ExploreRepository = remember { ExploreRepository() }
+    exploreRepository: ExploreRepository = remember { ExploreRepository() },
+    visitActions: VisitFlowActions? = null,
 ) {
-    val scope = rememberCoroutineScope()
 
     val activeLocationId by
     exploreRepository.activeLocationIdFlow.collectAsState()
@@ -52,18 +49,6 @@ fun MapScreen(
         mutableStateOf(
             activeLocationId ?: MockLocations.kallio.locationId
         )
-    }
-
-    var selectedDestination by remember {
-        mutableStateOf<Destination?>(null)
-    }
-
-    var unlockErrorMessage by remember {
-        mutableStateOf<String?>(null)
-    }
-
-    var newlyEarnedAchievement by remember {
-        mutableStateOf<UserAchievement?>(null)
     }
 
     val focusedLocation = remember(selectedLocationFilter) {
@@ -468,8 +453,7 @@ fun MapScreen(
 
                         Button(
                             onClick = {
-                                unlockErrorMessage = null
-                                selectedDestination = destination
+                                visitActions?.onOpenDestination?.invoke(destination, isDestUnlocked(destination.destinationId))
                             },
                             modifier = Modifier.weight(1f)
                         ) {
@@ -484,103 +468,4 @@ fun MapScreen(
         }
     }
 
-    // EXTENDED DESTINATION BOTTOM SHEET
-    selectedDestination?.let { destination ->
-
-        ExtendedDestinationCard(
-            destination = destination,
-            isLocked = !isDestUnlocked(destination.destinationId),
-
-            onBack = {
-                selectedDestination = null
-            },
-
-            // Uses the destination's mock QR code.
-            // Replace this with a real QR scanner result when integrated.
-            onUnlockQr = {
-                scope.launch {
-                    exploreRepository.unlockDestinationWithQr(
-                        destination,
-                        destination.qrCode
-                    ).onSuccess { (_, achievement) ->
-
-                        selectedDestination = null
-
-                        if (achievement != null) {
-                            newlyEarnedAchievement = achievement
-                        }
-
-                    }.onFailure { error ->
-                        unlockErrorMessage = error.message
-                    }
-                }
-            },
-
-            // Camera integration is not implemented by the supplied component.
-            onUnlockCamera = {
-                unlockErrorMessage =
-                    "Camera verification is not connected yet."
-            }
-        )
-    }
-
-    // ERROR DIALOG
-    unlockErrorMessage?.let { message ->
-        AlertDialog(
-            onDismissRequest = {
-                unlockErrorMessage = null
-            },
-            title = {
-                Text("Unlock information")
-            },
-            text = {
-                Text(message)
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        unlockErrorMessage = null
-                    }
-                ) {
-                    Text("OK")
-                }
-            }
-        )
-    }
-
-    // ACHIEVEMENT DIALOG
-    newlyEarnedAchievement?.let { achievement ->
-
-        AlertDialog(
-            onDismissRequest = {
-                newlyEarnedAchievement = null
-            },
-            icon = {
-                Icon(
-                    imageVector = Icons.Default.EmojiEvents,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.secondary
-                )
-            },
-            title = {
-                Text("${achievement.location.name} Explored! 🏆")
-            },
-            text = {
-                Text(
-                    "You unlocked every destination in ${achievement.location.name}! " +
-                            "The '${achievement.location.name} Explorer' achievement " +
-                            "has been saved to your profile."
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        newlyEarnedAchievement = null
-                    }
-                ) {
-                    Text("Great!")
-                }
-            }
-        )
-    }
 }

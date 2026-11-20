@@ -43,6 +43,8 @@ import com.example.travelock.ui.screens.profile.FriendProfileScreen
 import com.example.travelock.ui.screens.profile.ProfileScreen
 import com.example.travelock.ui.viewmodel.LocationViewModel
 import com.example.travelock.ui.viewmodel.ProfileViewModel
+import com.example.travelock.ui.visit.VisitFlowHost
+import com.example.travelock.ui.visit.rememberVisitFlowController
 import kotlinx.coroutines.launch
 
 /**
@@ -89,6 +91,7 @@ fun TravelockNavGraph(
     val editProfileUiState by profileViewModel.editState.collectAsState()
 
     val context = LocalContext.current
+    val visitController = rememberVisitFlowController(checkNotNull(loggedInUser).userId)
     val googleSignIn = remember(context) { com.example.travelock.ui.auth.GoogleAccountSignIn(context) }
     val snackbarHost = remember { SnackbarHostState() }
     LaunchedEffect(authState.error) {
@@ -188,73 +191,76 @@ fun TravelockNavGraph(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            when (currentMainRoute) {
-                BottomNavTab.HOME.route -> MainScreen(
-                    currentLocation = currentLocation
-                )
+            VisitFlowHost(visitController) { visitActions ->
+                when (currentMainRoute) {
+                    BottomNavTab.HOME.route -> MainScreen(
+                        currentLocation = currentLocation,
+                        visitActions = visitActions,
+                    )
 
-                BottomNavTab.FEED.route -> FeedScreen(
-                    currentUserId = loggedInUser?.userId ?: MockUsers.currentUser.userId,
-                    onOpenUserProfile = { userId ->
-                        if (userId == (loggedInUser?.userId ?: MockUsers.currentUser.userId)) {
-                            currentMainRoute = BottomNavTab.PROFILE.route
-                        } else {
+                    BottomNavTab.FEED.route -> FeedScreen(
+                        currentUserId = loggedInUser?.userId ?: MockUsers.currentUser.userId,
+                        onOpenUserProfile = { userId ->
+                            if (userId == (loggedInUser?.userId ?: MockUsers.currentUser.userId)) {
+                                currentMainRoute = BottomNavTab.PROFILE.route
+                            } else {
+                                selectedFriendId = userId
+                                currentMainRoute = "friend_profile"
+                            }
+                        }
+                    )
+
+                    BottomNavTab.MAP.route -> MapScreen(visitActions = visitActions)
+
+                    BottomNavTab.PROFILE.route -> ProfileScreen(
+                        uiState = profileUiState,
+                        currentThemeMode = currentThemeMode,
+                        onThemeModeChange = onThemeModeChange,
+                        onEditProfileClick = {
+                            profileViewModel.startEditing()
+                            currentMainRoute = "edit_profile"
+                        },
+                        onFriendClick = { friendId ->
+                            selectedFriendId = friendId
+                            currentMainRoute = "friend_profile"
+                        },
+                        onLogoutClick = {
+                            profileViewModel.syncWithAuthUser(null)
+                            authViewModel.flow.logout { googleSignIn.clearCredentialState() }
+                        },
+                        onRefresh = { profileViewModel.loadProfile(forceRefresh = true) },
+                        allowProfileEditing = true
+                    )
+
+                    "edit_profile" -> EditProfileScreen(
+                        editState = editProfileUiState,
+                        currentUser = profileUiState.toDisplayUser(),
+                        onUsernameChange = profileViewModel::onUsernameChange,
+                        onFullNameChange = profileViewModel::onFullNameChange,
+                        onImageChange = profileViewModel::onImageChange,
+                        onSave = {
+                            profileViewModel.saveProfile(context) {
+                                currentMainRoute = BottomNavTab.PROFILE.route
+                                scope.launch {
+                                    snackbarHost.showSnackbar("Profile updated")
+                                }
+                            }
+                        },
+                        onCancel = { currentMainRoute = BottomNavTab.PROFILE.route }
+                    )
+
+                    "friend_profile" -> FriendProfileScreen(
+                        friendUserId = selectedFriendId ?: MockUsers.amir.userId
+                    )
+
+                    "notifications" -> NotificationsScreen(
+                        onNavigateToFeed = { currentMainRoute = BottomNavTab.FEED.route },
+                        onNavigateToUserProfile = { userId ->
                             selectedFriendId = userId
                             currentMainRoute = "friend_profile"
                         }
-                    }
-                )
-
-                BottomNavTab.MAP.route -> MapScreen()
-
-                BottomNavTab.PROFILE.route -> ProfileScreen(
-                    uiState = profileUiState,
-                    currentThemeMode = currentThemeMode,
-                    onThemeModeChange = onThemeModeChange,
-                    onEditProfileClick = {
-                        profileViewModel.startEditing()
-                        currentMainRoute = "edit_profile"
-                    },
-                    onFriendClick = { friendId ->
-                        selectedFriendId = friendId
-                        currentMainRoute = "friend_profile"
-                    },
-                    onLogoutClick = {
-                        profileViewModel.syncWithAuthUser(null)
-                        authViewModel.flow.logout { googleSignIn.clearCredentialState() }
-                    },
-                    onRefresh = { profileViewModel.loadProfile(forceRefresh = true) },
-                    allowProfileEditing = true
-                )
-
-                "edit_profile" -> EditProfileScreen(
-                    editState = editProfileUiState,
-                    currentUser = profileUiState.toDisplayUser(),
-                    onUsernameChange = profileViewModel::onUsernameChange,
-                    onFullNameChange = profileViewModel::onFullNameChange,
-                    onImageChange = profileViewModel::onImageChange,
-                    onSave = {
-                        profileViewModel.saveProfile(context) {
-                            currentMainRoute = BottomNavTab.PROFILE.route
-                            scope.launch {
-                                snackbarHost.showSnackbar("Profile updated")
-                            }
-                        }
-                    },
-                    onCancel = { currentMainRoute = BottomNavTab.PROFILE.route }
-                )
-
-                "friend_profile" -> FriendProfileScreen(
-                    friendUserId = selectedFriendId ?: MockUsers.amir.userId
-                )
-
-                "notifications" -> NotificationsScreen(
-                    onNavigateToFeed = { currentMainRoute = BottomNavTab.FEED.route },
-                    onNavigateToUserProfile = { userId ->
-                        selectedFriendId = userId
-                        currentMainRoute = "friend_profile"
-                    }
-                )
+                    )
+                }
             }
         }
     }

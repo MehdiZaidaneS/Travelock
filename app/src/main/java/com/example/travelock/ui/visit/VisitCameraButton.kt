@@ -117,6 +117,7 @@ fun VisitCameraButton(
             }
         },
         modifier = modifier,
+        colors = visitButtonColors(),
         enabled = enabled && visit.completedAt == null && visit.cancelledAt == null && pendingFile == null && !preparingPhoto,
     ) {
         Text(stringResource(if (preparingPhoto) R.string.visit_photo_preparing else R.string.visit_photo_take))

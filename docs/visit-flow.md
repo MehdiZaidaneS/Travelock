@@ -1,6 +1,24 @@
 # Visit flow
 
-Scan the destination QR, take a live photo, then complete the visit within 50 metres. Enrolment is optional in the current implementation.
+Enroll in a destination, scan its QR, take a live photo, then complete the visit within 50 metres. The app requires enrolment before a new scan; the existing server RPCs do not enforce enrolment.
+
+## App screens
+
+The destination sheet shows unlocking requirements and an Enroll button. Enroll saves the enrolment through UserEnrolmentRepository and stays on the details sheet, showing Enrolled. It does not open the scanner or create a visit attempt. A separate Verify visit action opens verification when the user is ready. Home lists unfinished enrolled destinations under Your visits; selecting one opens its details and requirements.
+
+VisitFlowHost = keeps app content in place and hosts one destination sheet for details and verification. VisitFlowController = serializes enrolment, scan, completion, retry, cancellation and unenrolment actions for the signed-in user. MainActivity is unchanged.
+
+Verify visit expands verification inside the same destination sheet, retaining the destination header. A QR / Photo / Unlock indicator shows progress, with one main action at a time: Scan QR, Take photo, or Verify and unlock when a photo was already uploaded. Errors appear inline beside the actions. QR and camera are consecutive steps; the system scanner/camera still opens externally. Only a matching destination QR starts the attempt.
+
+Continue later keeps the checkpoint; Resume visit reopens it. Reopening the app loads the current user's pending attempt. Finish or cancel it before starting a different destination. Location failures retain the attempt; an upload followed by failed verification retains its path for retry. A photo discarded before upload requires a new capture.
+
+Successful completion refreshes home unlocks and enrolments. The map still uses its existing mock catalogue/status; its Enroll action now uses the real visit flow, so a demo destination missing from Supabase cannot be enrolled or verified. Live map data and optional sharing remain separate integration work.
+
+## Unenroll
+
+Unenroll asks for confirmation, then removes the selected user's destination plan. For a matching unfinished attempt, the app first cancels it and deletes its uploaded evidence. Cleanup failure retains the plan/checkpoint for retry. If deletion fails after successful cancellation, the plan remains and Unenroll can retry without cancelling again. Cancellation is completed before deletion; these network operations are not atomic.
+
+Cancel verification asks for confirmation and cancels/cleans up the attempt but keeps the enrolment. Completed visits, unlocks and achievements are not deleted by unenrolment. The sheet shows completed destinations as unlocked rather than offering Unenroll; completed plans can still be removed using the repository without changing their history.
 
 ## Calls in order
 
@@ -19,7 +37,11 @@ The camera flow requires a new capture. Server checks do not establish genuine c
 
 Request foreground precise location from the screen. The Google scanner/system camera handle their capture interfaces.
 
+VisitLocationAccess = shows Precise location allowed when permission is already granted. Otherwise Allow precise location requests it, and Open app settings lets the user change blocked/approximate access. If device location services are off, Turn on location services opens Android location settings. Permission/service state refreshes after returning from Settings or the camera. Permission grant alone does not complete a visit; take the photo or retry verification afterward.
+
 LocationPermissionRequired, LocationServicesDisabled and LocationUnavailable need an explanation and retry action. Server errors throw; retain the attempt/path.
+
+VisitErrorMessage = maps known error reasons to fixed app-written text and uses a generic fallback for unknown failures. Never display SDK exception messages, request URLs, headers or credentials. A rejected distance check keeps the uploaded path and Verify and unlock available for retry. The radius remains 50 metres.
 
 After upload succeeds, use completeUploadedVisit(visit, photoPath). It obtains a fresh location and reuses the photo.
 

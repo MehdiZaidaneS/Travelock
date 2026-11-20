@@ -12,6 +12,22 @@ import kotlinx.serialization.json.put
 class UserEnrolmentRepository {
     private val supabase = SupabaseProvider.client
 
+    // Removing a plan never deletes its completed visit, unlock or achievement.
+    // A retry is harmless when the enrolment has already been removed.
+    suspend fun unenrolFromDestination(destinationId: String) {
+        require(destinationId.isNotBlank()) { "Destination ID cannot be blank." }
+        supabase.auth.awaitInitialization()
+        val user = checkNotNull(supabase.auth.currentUserOrNull()) {
+            "You must sign in before removing an enrolment."
+        }
+        supabase.from("user_enrolments").delete {
+            filter {
+                eq("user_id", user.id)
+                eq("destination_id", destinationId)
+            }
+        }
+    }
+
     suspend fun enrolInDestination(destinationId: String): UserEnrolment {
         require(destinationId.isNotBlank()) { "Destination ID cannot be blank." }
         supabase.auth.awaitInitialization()

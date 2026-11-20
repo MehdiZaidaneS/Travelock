@@ -113,10 +113,13 @@ Initial routes require valid destinations. Removing the last stop can leave an e
 UserEnrolmentRepository:
 
 - enrolInDestination(destinationId) = saves an enrolment without duplicates.
+- unenrolFromDestination(destinationId) = deletes only the signed-in user's plan for this destination; repeating a completed deletion is harmless. Requires the 20261120000000_unenrol_destination.sql migration. It does not delete attempts, photos, unlocks or achievements itself.
 - getMyEnrolments() = lists the user's enrolments.
 - getMyEnrolmentsWithDestinations() = includes destination details.
 
-Enrolment does not unlock anything and is optional in the current completion flow.
+Enrolment does not unlock anything. The app requires it before starting a new QR scan; the existing visit RPCs do not enforce it.
+
+VisitFlowHost = hosts one destination sheet over the current app content. Enroll saves the enrolment and keeps destination details/requirements visible with Enrolled status; no scanner navigation or visit attempt is triggered. Verify visit = expands QR/photo/location verification inside that same sheet, with a progress indicator and inline errors. VisitFlowController = retains each user's saved attempt/photo path, prevents concurrent actions and supports resume, retry, cancellation and unenrolment. Unenroll confirms first; for a matching pending attempt it cancels and cleans up photos before deleting the plan. Cleanup failure keeps the plan/checkpoint; deletion failure after cancellation keeps the plan for retry. These calls are sequential, not atomic. Cancel verification keeps the enrolment. Completed history is preserved. Home shows unfinished enrolled destinations under Your visits; selecting one opens its details. Home refreshes its data after enrolment, removal and completion. MainActivity is unchanged. The map's catalogue/status still uses mock data; its enrolment/verification actions use the same real backend, so demo destinations absent from Supabase cannot be enrolled or verified.
 
 UserUnlockRepository:
 
@@ -127,6 +130,10 @@ UserUnlockRepository:
 - getMyUnlocksWithDestinations() = includes destination details.
 
 Use VisitCompletionCoordinator for normal camera/upload/location handling. Show success only after server acceptance. Refresh unlocks, map status and achievements afterward.
+
+VisitLocationAccess = displays the current precise-permission state, requests missing permission, offers app settings for blocked/approximate access and location settings when device location services are off. It refreshes on returning to the foreground; granting permission alone does not run verification.
+
+visitErrorMessage(error) = converts visit failures to fixed app-written messages. Unknown errors use a generic retry message. SDK exception text can contain credentials and must never be displayed or logged. Distance rejection retains the uploaded photo for retry; the server radius remains 50 metres.
 
 ## Posts
 

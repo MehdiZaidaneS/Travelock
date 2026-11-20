@@ -14,11 +14,42 @@ import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
+import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class UserEnrolmentRepositoryIntegrationTest {
+    // Opt in with a spare account/destination without an existing enrolment.
+    // This test creates and removes its own plan; it never touches a visit/photo.
+    @Test
+    fun removesOwnPlanWithoutChangingUnlocks() = runBlocking {
+        val arguments = InstrumentationRegistry.getArguments()
+        assumeTrue("Set supabaseUnenrolTest=true for the live deletion check.",
+            arguments.getString("supabaseUnenrolTest") == "true")
+        val email = requireNotNull(arguments.getString("supabaseTestEmail"))
+        val password = requireNotNull(arguments.getString("supabaseTestPassword"))
+        val destinationId = requireNotNull(arguments.getString("supabaseTestDestinationId"))
+        val supabase = SupabaseProvider.client
+        supabase.auth.awaitInitialization()
+        try {
+            supabase.auth.signInWith(Email) { this.email = email; this.password = password }
+            val repository = UserEnrolmentRepository()
+            val before = repository.getMyEnrolments().toSet()
+            assumeTrue("Choose a spare destination without an existing plan.", before.none { it.destinationId == destinationId })
+            val unlocksBefore = UserUnlockRepository().getMyUnlocks().toSet()
+            repository.enrolInDestination(destinationId)
+            assertTrue(repository.getMyEnrolments().any { it.destinationId == destinationId })
+            repository.unenrolFromDestination(destinationId)
+            assertEquals(before, repository.getMyEnrolments().toSet())
+            repository.unenrolFromDestination(destinationId)
+            assertEquals(before, repository.getMyEnrolments().toSet())
+            assertEquals(unlocksBefore, UserUnlockRepository().getMyUnlocks().toSet())
+        } finally {
+            supabase.auth.signOut()
+        }
+    }
+
     // Uses local test arguments and leaves this account's enrolment saved.
     // Repeated runs reuse the same row; this test does not award an unlock.
     @Test
