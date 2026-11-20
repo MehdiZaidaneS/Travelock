@@ -73,6 +73,8 @@ Visit evidence remains private. Publishing a post is a separate optional step wi
 
 The completed destination sheet offers Share photo and Done. Share photo also works when reopening an unlocked destination with a completed photo-backed visit. It previews the latest completed visit's same camera image, with an optional caption and Friends selected by default. Public means all signed-in Travelock users. Only Post publishes; Done/Not now leave the visit completed without creating a post.
 
+To share later, open Explore, then Your visits > Completed, and select a destination. Planned lists enrolled destinations that are not unlocked; Completed lists the user's unlocked destinations, newest unlock first, independently of search results or enrollment. Profile > Unlocked Destinations also opens the same destination sheet. Both entry points offer Share photo through the existing composer. An older/manual unlock without a completed photo-backed visit can be viewed but has no photo to share; the sharing preview explains this instead of publishing.
+
 The existing feed and post card display the result. Friends & you includes the author's own posts; View in feed opens the matching audience feed and highlights the requested own post at the start. If the latest completed visit already has a post, sharing shows Already shared and View in feed instead of creating another.
 
 Verification and sharing disable sheet swipe dismissal while keeping content scrollable. Back or Close on an unposted sharing preview asks Leave sharing?; Keep editing retains the current caption and audience. Explicitly leaving discards unsent edits, while an attempted publish request remains available for confirmation or retry.

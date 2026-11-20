@@ -17,6 +17,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -35,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.travelock.data.model.User
+import com.example.travelock.data.model.Destination
 import com.example.travelock.ui.components.AchievementBadgeCard
 import com.example.travelock.ui.components.ProfilePhotoAvatar
 import com.example.travelock.ui.components.ThemeSwitcher
@@ -58,6 +61,7 @@ fun ProfileScreen(
     onLogoutClick: () -> Unit,
     onRefresh: () -> Unit = {},
     allowProfileEditing: Boolean = true,
+    onOpenDestination: ((Destination) -> Unit)? = null,
 ) {
     val user = remember(uiState.userId, uiState.username, uiState.name, uiState.email, uiState.profileImage, uiState.createdAt) {
         uiState.toDisplayUser()
@@ -313,10 +317,12 @@ fun ProfileScreen(
             }
         } else {
             items(uiState.unlocks, key = { it.unlockId }) { unlock ->
-                val destName = unlock.destination?.name
-                    ?: allDestinations.find { it.destinationId == unlock.destinationId }?.name
-                    ?: unlock.destinationId
+                val destination = unlock.destination
+                    ?: allDestinations.find { it.destinationId == unlock.destinationId }
+                val destName = destination?.name ?: unlock.destinationId
                 Card(
+                    onClick = { destination?.let { onOpenDestination?.invoke(it) } },
+                    enabled = destination != null && onOpenDestination != null,
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surface
@@ -329,17 +335,22 @@ fun ProfileScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
+                        Icon(Icons.Default.CheckCircle, contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(end = 12.dp))
                         Text(
-                            text = "✅ $destName",
+                            text = destName,
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.weight(1f)
                         )
                         Text(
-                            text = "Visited",
+                            text = if (destination != null && onOpenDestination != null) "View visit" else "Visited",
                             style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.primary
                         )
+                        if (destination != null && onOpenDestination != null) {
+                            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+                        }
                     }
                 }
             }

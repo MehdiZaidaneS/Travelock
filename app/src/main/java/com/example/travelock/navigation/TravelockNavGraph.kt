@@ -235,6 +235,7 @@ fun TravelockNavGraph(
                             authViewModel.flow.logout { googleSignIn.clearCredentialState() }
                         },
                         onRefresh = { profileViewModel.loadProfile(forceRefresh = true) },
+                        onOpenDestination = { destination -> visitActions.onOpenDestination(destination, true) },
                         allowProfileEditing = true
                     )
 

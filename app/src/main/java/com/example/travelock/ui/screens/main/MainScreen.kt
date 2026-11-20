@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
@@ -17,7 +18,6 @@ import com.example.travelock.data.repository.UserUnlockRepository
 import com.example.travelock.data.repository.UserEnrolmentRepository
 import com.example.travelock.data.location.DeviceLocationResult
 import com.example.travelock.data.repository.DestinationRepository
-import com.example.travelock.ui.components.DestinationCard
 import com.example.travelock.ui.components.DiscountCard
 
 import com.example.travelock.ui.components.ExtendedLocationCard
@@ -62,17 +62,24 @@ fun MainScreen(
     var unlockError by remember {
         mutableStateOf<String?>(null)
     }
+    var completedDestinations by remember { mutableStateOf<List<Destination>>(emptyList()) }
+    var selectedVisitTab by rememberSaveable { mutableStateOf(VisitListTab.PLANNED) }
+    var unlockRetry by remember { mutableStateOf(0) }
     var enrolledDestinations by remember { mutableStateOf<List<Destination>>(emptyList()) }
+    var isLoadingEnrolments by remember { mutableStateOf(true) }
     var enrolmentError by remember { mutableStateOf<String?>(null) }
     var enrolmentRetry by remember { mutableStateOf(0) }
     LaunchedEffect(enrolmentRepository, unlockRevision, enrolmentRetry) {
         try {
+            isLoadingEnrolments = true
             enrolmentError = null
             enrolledDestinations = enrolmentRepository.getMyEnrolmentsWithDestinations().mapNotNull { it.destination }
         } catch (error: kotlinx.coroutines.CancellationException) {
             throw error
         } catch (_: Exception) {
             enrolmentError = "Could not load your enrolled destinations."
+        } finally {
+            isLoadingEnrolments = false
         }
     }
 
@@ -81,19 +88,23 @@ fun MainScreen(
         currentLocation as? DeviceLocationResult.Available
 
     // GET USER UNLOCKS
-    LaunchedEffect(unlockRepository, unlockRevision) {
+    LaunchedEffect(unlockRepository, unlockRevision, unlockRetry) {
         try {
             isLoadingUnlocks = true
             unlockError = null
 
-            val unlocks = unlockRepository.getMyUnlocks()
+            val unlocks = unlockRepository.getMyUnlocksWithDestinations()
 
             unlockedDestinationIds = unlocks
                 .map { it.destinationId }
                 .toSet()
+            completedDestinations = unlocks.sortedByDescending { it.unlockedAt }
+                .mapNotNull { it.destination }.distinctBy { it.destinationId }
 
-        } catch (e: Exception) {
-            unlockError = e.message
+        } catch (error: kotlinx.coroutines.CancellationException) {
+            throw error
+        } catch (_: Exception) {
+            unlockError = "Could not load your completed destinations."
         } finally {
             isLoadingUnlocks = false
         }
@@ -184,22 +195,15 @@ fun MainScreen(
 
 
         if (searchQuery.isBlank()){
-            item {
-                Text("Your visits", style = MaterialTheme.typography.titleLarge)
-            }
-            enrolmentError?.let { message ->
-                item {
-                    Text(message, color = MaterialTheme.colorScheme.error)
-                    TextButton(onClick = { enrolmentRetry++ }) { Text("Retry") }
-                }
-            }
-            val pendingDestinations = enrolledDestinations.filter { it.destinationId !in unlockedDestinationIds }
-            if (pendingDestinations.isEmpty() && enrolmentError == null) {
-                item { Text("Enroll in a destination to plan your next visit.") }
-            }
-            items(pendingDestinations, key = { "enrolled_${it.destinationId}" }) { destination ->
-                DestinationCard(destination, isLocked = true, onClick = { visitActions?.onOpenDestination?.invoke(destination, isUnlocked(destination.destinationId)) })
-            }
+            yourVisitsSection(
+                selectedTab = selectedVisitTab, onTabSelected = { selectedVisitTab = it },
+                planned = enrolledDestinations.filter { it.destinationId !in unlockedDestinationIds },
+                completed = completedDestinations,
+                loading = isLoadingUnlocks || (selectedVisitTab == VisitListTab.PLANNED && isLoadingEnrolments),
+                error = unlockError ?: enrolmentError.takeIf { selectedVisitTab == VisitListTab.PLANNED },
+                onRetry = { unlockRetry++; enrolmentRetry++ },
+                onOpenDestination = { destination, unlocked -> visitActions?.onOpenDestination?.invoke(destination, unlocked) },
+            )
             // PROMOTIONS HEADER
             item {
                 Column(
