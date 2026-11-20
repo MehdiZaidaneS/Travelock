@@ -128,6 +128,7 @@ UserUnlockRepository:
 - cancelVisit(visitId) = cancels an unfinished attempt.
 - getMyUnlocks() = lists own unlock records.
 - getMyUnlocksWithDestinations() = includes destination details.
+- getLatestCompletedVisit(destinationId) = returns the user's latest completed, uncancelled visit with a photo for this destination, or null. Used when sharing later from a reopened destination.
 
 Use VisitCompletionCoordinator for normal camera/upload/location handling. Show success only after server acceptance. Refresh unlocks, map status and achievements afterward.
 
@@ -141,19 +142,31 @@ Posts require an owned completed, uncancelled visit. Sharing is optional.
 
 PostPhotoRepository.uploadPostPhoto(postId, jpegBytes) = uploads a JPEG up to 10 MiB and returns its private path. Generate a post UUID first.
 
+PostPhotoRepository.uploadVisitPhoto(postId, jpegBytes) = uploads the completed visit photo to a stable user/post/visit.jpg path in the existing post-photos bucket. A failed-response retry reuses an immutable object only when its downloaded bytes match; it never overwrites it.
+
+VisitPhotoRepository.downloadCompletedPhoto(visit) = downloads the signed-in user's completed visit image from private visit-photos. The app supplies the same image to the post upload; the original verification object stays private.
+
 PostRepository:
 
 - createPost(postId, visitId, imagePath, imageDescription = "", visibility = PostVisibility.FRIENDS) = creates the post; the server derives the destination from the visit.
-- getMyPosts() = lists own posts.
+- getMyPosts(maxResults = null) = lists own posts, optionally limited to 1–100 results.
+- getMyPost(postId) = returns that user's post by ID, or null; used to confirm a publish response and view an own post in the feed.
+- getMyLatestPostForVisit(visitId) = returns that user's latest existing post for the visit, or null. The sharing UI reopens an existing post instead of posting again.
 - getFriendsFeed(limit = 20) = lists accepted friends' posts, newest first; excludes own posts.
 - getPublicFeed(limit = 20) = lists public posts for signed-in viewers, including their own.
 
-Feed limits are 1–100. Older-page loading, single-post lookup, editing/deleting posts and changing visibility afterward are not implemented.
+Feed limits are 1–100. Older-page loading, lookup of another user's single post, editing/deleting posts and changing visibility afterward are not implemented.
+
+The existing FeedDetailsRepository combines recent own posts and friends' posts under Friends & you, without duplicates and newest first (20 items). Public Explore includes public posts only. View in feed can pin the requested own post to the start of its matching feed, including older posts. FeedScreen and PostCard remain the existing feed/rendering components; no second feed or post card was added.
+
+SharePostPanel = the single photo/caption/audience composer inside the destination sheet. Share photo reads the latest completed visit, previews its picture and defaults the audience to Friends. Done and Not now never publish. Only Post saves a publish request and starts the separate photo upload/post creation. SharePostController = retains this request, locks its caption/audience after the first attempt and presents a fixed safe error on failure. PostPublishingCoordinator = checks a stable post ID before creating and confirms an ambiguous insert response by reading that ID. PostDraftStore = stores only attempted request metadata per user/visit, not image bytes or credentials; reopening retries that request. Unsent edits before Post remain in memory only. These guards prevent duplicates for a retried request; they do not add a global one-post-per-visit database constraint across devices.
+
+ExtendedDestinationCard = disables sheet swipe dismissal during verification and sharing, leaving content scrolling enabled. VisitFlowHost asks before Back or Close leaves an unposted sharing preview; Keep editing retains unsent caption/audience. Explicit leave discards unsent edits, but preserves any attempted publish request for confirmation/retry.
 
 FRIENDS = author and accepted friends.
 PUBLIC = any signed-in user. Guests cannot read either.
 
-The attached image follows post visibility. Visit evidence stays private. Frontend image display needs authenticated storage access or suitable short-lived signed URLs; there is no production image-display helper. Previously downloaded images can remain cached after access changes.
+The attached image follows post visibility. Visit evidence stays private. Existing PostCard uses FeedDetailsRepository.downloadPostImage for authenticated post-photo display. Previewing does not change visibility; only explicit publishing attaches the separate copy to a feed post. A failed/cancelled sharing action never cancels or removes the completed visit. An upload from an attempted post may remain private/unattached until its request is retried; existing client policies do not permit deleting post photos. Previously downloaded images can remain cached after access changes.
 
 ## Likes and comments
 

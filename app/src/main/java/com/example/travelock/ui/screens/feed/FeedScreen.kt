@@ -19,6 +19,7 @@ import com.example.travelock.ui.components.PostCard
 import com.example.travelock.ui.components.TravelockSearchBar
 import com.example.travelock.ui.components.UserAvatarCircle
 import com.example.travelock.ui.viewmodel.FeedViewModel
+import com.example.travelock.data.model.Post
 
 /**
  * Wire FeedScreen to FeedViewModel for live Supabase feed loading,
@@ -28,9 +29,13 @@ import com.example.travelock.ui.viewmodel.FeedViewModel
 fun FeedScreen(
     currentUserId: String,
     onOpenUserProfile: (String) -> Unit,
-    feedViewModel: FeedViewModel = viewModel()
+    feedViewModel: FeedViewModel = viewModel(),
+    sharedPost: Post? = null,
 ) {
     val uiState by feedViewModel.uiState.collectAsState()
+    LaunchedEffect(currentUserId, sharedPost?.postId) {
+        if (sharedPost != null) feedViewModel.showOwnPost(sharedPost) else feedViewModel.loadFeed()
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -46,7 +51,7 @@ fun FeedScreen(
                 FilterChip(
                     selected = uiState.feedFilter == FeedFilter.FRIENDS,
                     onClick = { feedViewModel.setFeedFilter(FeedFilter.FRIENDS) },
-                    label = { Text("Friends Feed") }
+                    label = { Text("Friends & you") }
                 )
                 FilterChip(
                     selected = uiState.feedFilter == FeedFilter.PUBLIC,
@@ -135,7 +140,7 @@ fun FeedScreen(
         // Feed Header & Posts
         item {
             Text(
-                text = if (uiState.feedFilter == FeedFilter.FRIENDS) "Recent Friends Activity & Photos" else "Public Discovery Feed",
+                text = if (uiState.feedFilter == FeedFilter.FRIENDS) "Photos from you and your friends" else "Public Discovery Feed",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onBackground,
@@ -143,6 +148,12 @@ fun FeedScreen(
             )
         }
 
+        uiState.errorMessage?.let { message ->
+            item {
+                Text(message, color = MaterialTheme.colorScheme.error)
+                TextButton(onClick = feedViewModel::loadFeed) { Text("Retry") }
+            }
+        }
         if (uiState.isLoading) {
             item {
                 Box(

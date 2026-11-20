@@ -12,6 +12,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.CancellationException
+import com.example.travelock.data.model.Post
+import com.example.travelock.data.model.PostVisibility
 
 /**
  * Implement FeedViewModel for live feed loading, public/friends filter toggle,
@@ -25,25 +29,38 @@ class FeedViewModel : ViewModel() {
 
     private val _uiState = MutableStateFlow(FeedUiState())
     val uiState: StateFlow<FeedUiState> = _uiState.asStateFlow()
+    private var feedJob: Job? = null
+    private var ownPostToView: String? = null
 
     init {
         loadFeed()
     }
 
     fun loadFeed() {
-        viewModelScope.launch {
+        feedJob?.cancel()
+        val filter = _uiState.value.feedFilter
+        val focused = ownPostToView
+        feedJob = viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
             try {
-                val posts = feedDetailsRepo.loadFeed(_uiState.value.feedFilter)
+                val posts = feedDetailsRepo.loadFeed(filter, focused)
                 _uiState.update { it.copy(isLoading = false, posts = posts) }
-            } catch (e: Exception) {
-                _uiState.update { it.copy(isLoading = false, errorMessage = e.localizedMessage ?: "Failed to load feed") }
+            } catch (e: CancellationException) { throw e }
+            catch (_: Exception) {
+                _uiState.update { it.copy(isLoading = false, errorMessage = "Could not load the feed. Check your connection and retry.") }
             }
         }
     }
 
     fun setFeedFilter(filter: FeedFilter) {
-        _uiState.update { it.copy(feedFilter = filter) }
+        ownPostToView = null
+        _uiState.update { it.copy(feedFilter = filter, posts = emptyList()) }
+        loadFeed()
+    }
+    fun showOwnPost(post: Post) {
+        ownPostToView = post.postId
+        _uiState.update { it.copy(feedFilter = if (post.visibility == PostVisibility.PUBLIC) FeedFilter.PUBLIC else FeedFilter.FRIENDS,
+            posts = emptyList()) }
         loadFeed()
     }
     fun onSearchQueryChange(query: String) {
@@ -108,7 +125,7 @@ class FeedViewModel : ViewModel() {
                 interactionRepo.addComment(postId, content)
                 loadFeed()
             } catch (e: Exception) {
-                _uiState.update { it.copy(errorMessage = e.localizedMessage) }
+                _uiState.update { it.copy(errorMessage = "Could not save this action. Check your connection and try again.") }
             }
         }
     }
@@ -118,7 +135,7 @@ class FeedViewModel : ViewModel() {
                 friendshipRepo.sendFriendRequest(targetUserId)
                 onSearchQueryChange(_uiState.value.searchQuery)
             } catch (e: Exception) {
-                _uiState.update { it.copy(errorMessage = e.localizedMessage) }
+                _uiState.update { it.copy(errorMessage = "Could not save this action. Check your connection and try again.") }
             }
         }
     }
@@ -128,7 +145,7 @@ class FeedViewModel : ViewModel() {
                 friendshipRepo.acceptFriendRequest(requestId)
                 onSearchQueryChange(_uiState.value.searchQuery)
             } catch (e: Exception) {
-                _uiState.update { it.copy(errorMessage = e.localizedMessage) }
+                _uiState.update { it.copy(errorMessage = "Could not save this action. Check your connection and try again.") }
             }
         }
     }

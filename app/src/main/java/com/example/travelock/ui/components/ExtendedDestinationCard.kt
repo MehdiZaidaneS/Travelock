@@ -15,6 +15,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -29,24 +30,41 @@ fun ExtendedDestinationCard(
     modifier: Modifier = Modifier,
     busy: Boolean = false,
     verifying: Boolean = false,
+    sharing: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val currentBusy by rememberUpdatedState(busy)
+    val currentProtected by rememberUpdatedState(verifying || sharing)
+    val currentOnBack by rememberUpdatedState(onBack)
     val sheetState = rememberModalBottomSheetState(
         skipPartiallyExpanded = true,
-        confirmValueChange = { it != SheetValue.Hidden || !currentBusy },
+        confirmValueChange = { next ->
+            when {
+                next != SheetValue.Hidden -> true
+                currentBusy -> false
+                currentProtected -> {
+                    // Back/scrim dismissal goes through the screen's leave
+                    // handling without first hiding the sheet behind it.
+                    currentOnBack()
+                    false
+                }
+                else -> true
+            }
+        },
     )
     ModalBottomSheet(
         onDismissRequest = { if (!busy) onBack() },
         sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surface,
+        sheetGesturesEnabled = !busy && !verifying && !sharing,
+        dragHandle = if (verifying || sharing) null else { { BottomSheetDefaults.DragHandle() } },
     ) {
         Column(
-            modifier.fillMaxWidth(),
+            modifier.fillMaxWidth().imePadding().testTag("destination_sheet"),
         ) {
-            Row(Modifier.padding(horizontal = 20.dp).padding(bottom = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.padding(horizontal = 20.dp).padding(top = if (verifying || sharing) 20.dp else 0.dp, bottom = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text(if (verifying) "Verify your visit" else "Destination", style = MaterialTheme.typography.labelLarge,
+                    Text(if (sharing) "Share photo" else if (verifying) "Verify your visit" else "Destination", style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(destination.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                 }
@@ -59,7 +77,7 @@ fun ExtendedDestinationCard(
                     .padding(horizontal = 20.dp).padding(bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                if (destination.image.isNotBlank()) {
+                if (!sharing && destination.image.isNotBlank()) {
                     Surface(shape = RoundedCornerShape(16.dp)) {
                         AsyncImage(
                             model = destination.image, contentDescription = destination.name,
@@ -67,7 +85,7 @@ fun ExtendedDestinationCard(
                             contentScale = ContentScale.Crop,
                         )
                     }
-                } else if (!verifying) {
+                } else if (!sharing && !verifying) {
                     Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp),
                         color = MaterialTheme.colorScheme.surfaceContainerHigh) {
                         Box(Modifier.height(80.dp), contentAlignment = Alignment.Center) {
@@ -76,11 +94,11 @@ fun ExtendedDestinationCard(
                         }
                     }
                 }
-                if (!verifying && destination.description.isNotBlank()) {
+                if (!sharing && !verifying && destination.description.isNotBlank()) {
                     Text(destination.description, style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                if (!verifying && destination.discount > 0f) {
+                if (!sharing && !verifying && destination.discount > 0f) {
                     Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.secondaryContainer) {
                         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)) {

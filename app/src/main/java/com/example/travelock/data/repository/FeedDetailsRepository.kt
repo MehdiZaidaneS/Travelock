@@ -29,12 +29,20 @@ class FeedDetailsRepository {
     private val profileCache = mutableMapOf<String, ProfileSummary?>()
     private val destinationCache = mutableMapOf<String, Destination?>()
 
-    suspend fun loadFeed(filter: FeedFilter): List<FeedPostItem> = coroutineScope {
-        val rawPosts = if (filter == FeedFilter.FRIENDS) {
-            postRepository.getFriendsFeed()
+    suspend fun loadFeed(filter: FeedFilter, ownPostToView: String? = null): List<FeedPostItem> = coroutineScope {
+        val recent = if (filter == FeedFilter.FRIENDS) {
+            (postRepository.getFriendsFeed() + postRepository.getMyPosts(maxResults = 20))
+                .distinctBy { it.postId }
+                .sortedWith(compareByDescending<Post> { it.createdAt }.thenByDescending { it.postId }).take(20)
         } else {
             postRepository.getPublicFeed()
         }
+        // An explicitly requested own post remains visible even if older than
+        // the normal page. Public filtering never reveals a friends-only post.
+        val focused = ownPostToView?.let { postRepository.getMyPost(it) }?.takeIf {
+            filter == FeedFilter.FRIENDS || it.visibility == com.example.travelock.data.model.PostVisibility.PUBLIC
+        }
+        val rawPosts = if (focused == null) recent else (listOf(focused) + recent.filter { it.postId != focused.postId }).take(20)
 
         rawPosts.map { post ->
             async {

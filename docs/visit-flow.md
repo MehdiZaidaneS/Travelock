@@ -71,4 +71,12 @@ Completion is retry-safe and does not duplicate destination unlocks. Achievement
 
 Visit evidence remains private. Publishing a post is a separate optional step with a separate photo upload. PUBLIC posts still require signed-in viewers.
 
+The completed destination sheet offers Share photo and Done. Share photo also works when reopening an unlocked destination with a completed photo-backed visit. It previews the latest completed visit's same camera image, with an optional caption and Friends selected by default. Public means all signed-in Travelock users. Only Post publishes; Done/Not now leave the visit completed without creating a post.
+
+The existing feed and post card display the result. Friends & you includes the author's own posts; View in feed opens the matching audience feed and highlights the requested own post at the start. If the latest completed visit already has a post, sharing shows Already shared and View in feed instead of creating another.
+
+Verification and sharing disable sheet swipe dismissal while keeping content scrollable. Back or Close on an unposted sharing preview asks Leave sharing?; Keep editing retains the current caption and audience. Explicitly leaving discards unsent edits, while an attempted publish request remains available for confirmation or retry.
+
+After an attempted publish, retries keep the same post ID, caption and audience. The request is saved per account/visit before uploading, so reopening can confirm a response that was lost. Photo bytes stay in memory; previewing again downloads the private visit image. Errors are fixed app-written messages and never expose SDK request details. Sharing failure leaves the unlock and completed evidence intact. Unsent caption edits before tapping Post are not persisted, and interrupted uploads can leave an unattached private post image until retried.
+
 Development repository/manual emulator checks were reported passed. The physical-device camera/GPS check is deferred. Retry, recreation and reopen test modes cover different paths; one mode passing does not prove all modes.

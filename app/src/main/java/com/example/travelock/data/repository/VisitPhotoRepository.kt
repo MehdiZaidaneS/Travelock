@@ -10,6 +10,17 @@ import java.util.UUID
 class VisitPhotoRepository {
     private val supabase = SupabaseProvider.client
 
+    suspend fun downloadCompletedPhoto(visit: VisitAttempt): ByteArray {
+        supabase.auth.awaitInitialization()
+        val user = checkNotNull(supabase.auth.currentUserOrNull())
+        require(visit.userId == user.id && visit.completedAt != null && visit.cancelledAt == null)
+        val path = requireNotNull(visit.photoPath)
+        require(path.startsWith("${user.id}/${visit.visitId}/") && path.substringAfterLast('/').isNotBlank())
+        return supabase.storage.from("visit-photos").downloadAuthenticated(path).also {
+            require(it.isNotEmpty() && it.size <= 10 * 1024 * 1024)
+        }
+    }
+
     suspend fun deleteCancelledVisitPhotos(visit: VisitAttempt) {
         supabase.auth.awaitInitialization()
         val user = checkNotNull(supabase.auth.currentUserOrNull()) { "Sign in before cleaning up visit photos." }

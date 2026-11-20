@@ -7,12 +7,32 @@ import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
+import io.github.jan.supabase.postgrest.query.Order
+import io.github.jan.supabase.postgrest.query.filter.FilterOperator
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 // Scanning starts a visit. The database awards an unlock after photo/location checks.
 class UserUnlockRepository {
     private val supabase = SupabaseProvider.client
+
+    suspend fun getLatestCompletedVisit(destinationId: String): VisitAttempt? {
+        require(destinationId.isNotBlank())
+        supabase.auth.awaitInitialization()
+        val user = checkNotNull(supabase.auth.currentUserOrNull()) { "Sign in before sharing a visit." }
+        return supabase.from("visit_attempts").select {
+            filter {
+                eq("user_id", user.id)
+                eq("destination_id", destinationId)
+                filterNot("completed_at", FilterOperator.IS, null)
+                exact("cancelled_at", null)
+                filterNot("photo_path", FilterOperator.IS, null)
+            }
+            order("completed_at", Order.DESCENDING)
+            order("visit_id", Order.DESCENDING)
+            limit(1)
+        }.decodeSingleOrNull<VisitAttempt>()
+    }
 
     suspend fun startVisit(qrCode: String): VisitAttempt {
         require(qrCode.isNotBlank()) { "QR code cannot be blank." }

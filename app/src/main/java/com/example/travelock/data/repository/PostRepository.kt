@@ -14,6 +14,27 @@ import kotlinx.serialization.json.put
 class PostRepository {
     private val supabase = SupabaseProvider.client
 
+    suspend fun getMyPost(postId: String): Post? {
+        require(postId.isNotBlank())
+        supabase.auth.awaitInitialization()
+        val user = checkNotNull(supabase.auth.currentUserOrNull())
+        return supabase.from("posts").select {
+            filter { eq("user_id", user.id); eq("post_id", postId) }
+        }.decodeSingleOrNull<Post>()
+    }
+
+    suspend fun getMyLatestPostForVisit(visitId: String): Post? {
+        require(visitId.isNotBlank())
+        supabase.auth.awaitInitialization()
+        val user = checkNotNull(supabase.auth.currentUserOrNull())
+        return supabase.from("posts").select {
+            filter { eq("user_id", user.id); eq("visit_id", visitId) }
+            order("created_at", Order.DESCENDING)
+            order("post_id", Order.DESCENDING)
+            limit(1)
+        }.decodeSingleOrNull<Post>()
+    }
+
     // Explicitly filter friends: RLS also allows public posts by other users.
     suspend fun getFriendsFeed(limit: Int = 20): List<Post> {
         require(limit in 1..100) { "Feed limit must be between 1 and 100." }
@@ -87,13 +108,15 @@ class PostRepository {
         return supabase.from("posts").insert(data) { select() }.decodeSingle<Post>()
     }
 
-    suspend fun getMyPosts(): List<Post> {
+    suspend fun getMyPosts(maxResults: Int? = null): List<Post> {
+        require(maxResults == null || maxResults in 1..100)
         supabase.auth.awaitInitialization()
         val user = checkNotNull(supabase.auth.currentUserOrNull()) { "Sign in before loading your posts." }
         return supabase.from("posts").select {
             filter { eq("user_id", user.id) }
             order("created_at", Order.DESCENDING)
             order("post_id", Order.DESCENDING)
+            if (maxResults != null) limit(maxResults.toLong())
         }.decodeList<Post>()
     }
 }

@@ -45,6 +45,8 @@ import com.example.travelock.ui.viewmodel.LocationViewModel
 import com.example.travelock.ui.viewmodel.ProfileViewModel
 import com.example.travelock.ui.visit.VisitFlowHost
 import com.example.travelock.ui.visit.rememberVisitFlowController
+import com.example.travelock.ui.share.rememberSharePostFactory
+import com.example.travelock.data.model.Post
 import kotlinx.coroutines.launch
 
 /**
@@ -92,6 +94,8 @@ fun TravelockNavGraph(
 
     val context = LocalContext.current
     val visitController = rememberVisitFlowController(checkNotNull(loggedInUser).userId)
+    val sharePostFactory = rememberSharePostFactory(loggedInUser.userId)
+    var feedPostToView by remember(loggedInUser.userId) { mutableStateOf<Post?>(null) }
     val googleSignIn = remember(context) { com.example.travelock.ui.auth.GoogleAccountSignIn(context) }
     val snackbarHost = remember { SnackbarHostState() }
     LaunchedEffect(authState.error) {
@@ -191,7 +195,8 @@ fun TravelockNavGraph(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            VisitFlowHost(visitController) { visitActions ->
+            VisitFlowHost(visitController, shareFactory = sharePostFactory,
+                onViewInFeed = { post -> feedPostToView = post; currentMainRoute = BottomNavTab.FEED.route }) { visitActions ->
                 when (currentMainRoute) {
                     BottomNavTab.HOME.route -> MainScreen(
                         currentLocation = currentLocation,
@@ -199,6 +204,7 @@ fun TravelockNavGraph(
                     )
 
                     BottomNavTab.FEED.route -> FeedScreen(
+                        sharedPost = feedPostToView,
                         currentUserId = loggedInUser?.userId ?: MockUsers.currentUser.userId,
                         onOpenUserProfile = { userId ->
                             if (userId == (loggedInUser?.userId ?: MockUsers.currentUser.userId)) {

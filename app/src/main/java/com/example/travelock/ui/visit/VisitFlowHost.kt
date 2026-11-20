@@ -17,12 +17,15 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.travelock.data.model.Destination
+import com.example.travelock.data.model.Post
 import com.example.travelock.data.qr.QrCodeScanner
 import com.example.travelock.data.repository.DestinationRepository
 import com.example.travelock.data.repository.UserEnrolmentRepository
 import com.example.travelock.data.repository.UserUnlockRepository
 import com.example.travelock.data.visit.VisitCompletionCoordinator
 import com.example.travelock.ui.components.ExtendedDestinationCard
+import com.example.travelock.ui.share.SharePostController
+import com.example.travelock.ui.share.SharePostPanel
 import kotlinx.coroutines.launch
 
 // These existing paired theme roles retain readable contrast in both themes.
@@ -56,6 +59,8 @@ fun rememberVisitFlowController(userId: String): VisitFlowController {
 fun VisitFlowHost(
     controller: VisitFlowController,
     scanner: QrCodeScanner = rememberQrCodeScanner(),
+    shareFactory: ((Destination) -> SharePostController)? = null,
+    onViewInFeed: (Post) -> Unit = {},
     content: @Composable (VisitFlowActions) -> Unit,
 ) {
     val state by controller.state.collectAsState()
@@ -80,8 +85,36 @@ fun VisitFlowHost(
             }
         }
         state.destination?.let { destination ->
-            ExtendedDestinationCard(destination, onBack = controller::close, busy = state.busy, verifying = state.verifying) {
-                VisitDestinationPanel(state, controller, scanner)
+            val shareController = remember(shareFactory, destination.destinationId) { shareFactory?.invoke(destination) }
+            val shareState = shareController?.state?.collectAsState()?.value
+            var sharing by remember(destination.destinationId) { mutableStateOf(false) }
+            var confirmLeaveSharing by remember(destination.destinationId) { mutableStateOf(false) }
+            val requestClose: () -> Unit = {
+                if (!state.busy && shareState?.busy != true) {
+                    if (sharing && shareState?.posted == null) confirmLeaveSharing = true
+                    else controller.close()
+                }
+            }
+            ExtendedDestinationCard(destination, onBack = requestClose,
+                busy = state.busy || shareState?.busy == true, verifying = state.verifying, sharing = sharing) {
+                if (sharing && shareController != null) {
+                    SharePostPanel(shareController, destination, onBack = { sharing = false }, onDone = controller::close,
+                        onViewInFeed = { post -> controller.close(); onViewInFeed(post) })
+                } else {
+                    VisitDestinationPanel(state, controller, scanner,
+                        onShare = if (shareController == null) null else { { sharing = true } })
+                }
+            }
+            if (confirmLeaveSharing) {
+                AlertDialog(
+                    onDismissRequest = { confirmLeaveSharing = false },
+                    title = { Text("Leave sharing?") },
+                    text = { Text(if (shareState?.request != null)
+                        "Your post is awaiting confirmation. You can reopen this visit to check or retry the same post. Your completed visit stays saved."
+                        else "This closes the preview without posting. Unposted caption and audience changes will be discarded. Your completed visit stays saved.") },
+                    confirmButton = { TextButton(onClick = { confirmLeaveSharing = false; controller.close() }) { Text("Leave sharing") } },
+                    dismissButton = { TextButton(onClick = { confirmLeaveSharing = false }) { Text("Keep editing") } },
+                )
             }
         }
     }
@@ -90,7 +123,7 @@ fun VisitFlowHost(
 data class VisitFlowActions(val onOpenDestination: (Destination, Boolean) -> Unit, val revision: Int)
 
 @Composable
-private fun VisitErrorNotice(message: String) {
+internal fun VisitErrorNotice(message: String) {
     Surface(color = MaterialTheme.colorScheme.errorContainer, shape = MaterialTheme.shapes.medium,
         modifier = Modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Assertive }) {
         Row(Modifier.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -101,7 +134,7 @@ private fun VisitErrorNotice(message: String) {
 }
 
 @Composable
-private fun VisitDestinationPanel(state: VisitFlowState, controller: VisitFlowController, scanner: QrCodeScanner) {
+private fun VisitDestinationPanel(state: VisitFlowState, controller: VisitFlowController, scanner: QrCodeScanner, onShare: (() -> Unit)?) {
     val scope = rememberCoroutineScope()
     val destination = checkNotNull(state.destination)
     val progress = state.progress
@@ -118,7 +151,12 @@ private fun VisitDestinationPanel(state: VisitFlowState, controller: VisitFlowCo
             }
         }
         state.error?.let { VisitErrorNotice(it) }
-        Button(onClick = controller::close, enabled = !state.busy, colors = visitButtonColors(), modifier = Modifier.fillMaxWidth()) { Text("Done") }
+        if (onShare != null) {
+            Button(onClick = onShare, enabled = !state.busy, colors = visitButtonColors(), modifier = Modifier.fillMaxWidth()) { Text("Share photo") }
+            TextButton(onClick = controller::close, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) { Text("Done") }
+        } else {
+            Button(onClick = controller::close, enabled = !state.busy, colors = visitButtonColors(), modifier = Modifier.fillMaxWidth()) { Text("Done") }
+        }
     } else {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text(if (enrolled) "Enrolled" else "Plan your visit", style = MaterialTheme.typography.titleMedium,
