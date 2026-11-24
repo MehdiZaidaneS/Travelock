@@ -8,6 +8,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -15,11 +16,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.travelock.data.model.Post
 import com.example.travelock.ui.components.PostCard
 import com.example.travelock.ui.components.TravelockSearchBar
 import com.example.travelock.ui.components.UserAvatarCircle
 import com.example.travelock.ui.viewmodel.FeedViewModel
-import com.example.travelock.data.model.Post
 
 /**
  * Wire FeedScreen to FeedViewModel for live Supabase feed loading,
@@ -33,8 +34,18 @@ fun FeedScreen(
     sharedPost: Post? = null,
 ) {
     val uiState by feedViewModel.uiState.collectAsState()
+    var lastLoadedUserId by remember { mutableStateOf<String?>(null) }
+
     LaunchedEffect(currentUserId, sharedPost?.postId) {
-        if (sharedPost != null) feedViewModel.showOwnPost(sharedPost) else feedViewModel.loadFeed()
+        if (sharedPost != null) {
+            feedViewModel.showOwnPost(sharedPost)
+            lastLoadedUserId = currentUserId
+        } else if (lastLoadedUserId != null && lastLoadedUserId != currentUserId) {
+            feedViewModel.loadFeed()
+            lastLoadedUserId = currentUserId
+        } else {
+            lastLoadedUserId = currentUserId
+        }
     }
 
     LazyColumn(
@@ -42,11 +53,12 @@ fun FeedScreen(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Filter Chips (Friends vs Public)
+        // Filter Chips (Friends vs Public) & Refresh Action
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 FilterChip(
                     selected = uiState.feedFilter == FeedFilter.FRIENDS,
@@ -58,6 +70,16 @@ fun FeedScreen(
                     onClick = { feedViewModel.setFeedFilter(FeedFilter.PUBLIC) },
                     label = { Text("Public Explore") }
                 )
+                Spacer(modifier = Modifier.weight(1f))
+                IconButton(
+                    onClick = { feedViewModel.loadFeed() },
+                    enabled = !uiState.isLoading
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = "Refresh feed"
+                    )
+                }
             }
         }
 
@@ -111,13 +133,21 @@ fun FeedScreen(
                         when (result.relationshipStatus) {
                             RelationshipStatus.FRIENDS -> {
                                 OutlinedButton(onClick = { onOpenUserProfile(profile.userId) }) {
-                                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
+                                    Icon(
+                                        Icons.Default.Check,
+                                        contentDescription = null,
+                                        modifier = Modifier.padding(end = 4.dp)
+                                    )
                                     Text("Friends")
                                 }
                             }
                             RelationshipStatus.OUTGOING_PENDING -> {
                                 OutlinedButton(onClick = {}, enabled = false) {
-                                    Icon(Icons.Default.HourglassEmpty, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
+                                    Icon(
+                                        Icons.Default.HourglassEmpty,
+                                        contentDescription = null,
+                                        modifier = Modifier.padding(end = 4.dp)
+                                    )
                                     Text("Requested")
                                 }
                             }
@@ -128,7 +158,11 @@ fun FeedScreen(
                             }
                             RelationshipStatus.NONE -> {
                                 Button(onClick = { feedViewModel.sendFriendRequest(profile.userId) }) {
-                                    Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.padding(end = 6.dp))
+                                    Icon(
+                                        Icons.Default.PersonAdd,
+                                        contentDescription = null,
+                                        modifier = Modifier.padding(end = 6.dp)
+                                    )
                                     Text("Add Friend")
                                 }
                             }
@@ -137,10 +171,15 @@ fun FeedScreen(
                 }
             }
         }
+
         // Feed Header & Posts
         item {
             Text(
-                text = if (uiState.feedFilter == FeedFilter.FRIENDS) "Photos from you and your friends" else "Public Discovery Feed",
+                text = if (uiState.feedFilter == FeedFilter.FRIENDS) {
+                    "Photos from you and your friends"
+                } else {
+                    "Public Discovery Feed"
+                },
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onBackground,
@@ -150,10 +189,31 @@ fun FeedScreen(
 
         uiState.errorMessage?.let { message ->
             item {
-                Text(message, color = MaterialTheme.colorScheme.error)
-                TextButton(onClick = feedViewModel::loadFeed) { Text("Retry") }
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = message,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.weight(1f)
+                        )
+                        TextButton(onClick = feedViewModel::loadFeed) {
+                            Text("Retry")
+                        }
+                    }
+                }
             }
         }
+
         if (uiState.isLoading) {
             item {
                 Box(
@@ -168,7 +228,11 @@ fun FeedScreen(
         } else if (uiState.posts.isEmpty()) {
             item {
                 Text(
-                    text = "No posts found.",
+                    text = if (uiState.feedFilter == FeedFilter.FRIENDS) {
+                        "No recent photo posts from you or your friends yet."
+                    } else {
+                        "No public photo posts found."
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(vertical = 16.dp)
