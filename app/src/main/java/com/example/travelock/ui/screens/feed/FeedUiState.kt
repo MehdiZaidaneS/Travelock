@@ -31,7 +31,8 @@ data class FeedPostItem(
     val author: ProfileSummary?,
     val destination: Destination?,
     val interaction: PostInteractionSummary,
-    val comments: List<FeedCommentItem>
+    val comments: List<FeedCommentItem>,
+    val achievementBadge: String? = null
 )
 
 data class FeedUiState(
