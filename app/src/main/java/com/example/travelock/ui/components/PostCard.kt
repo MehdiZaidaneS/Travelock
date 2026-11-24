@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Comment
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Place
@@ -13,16 +14,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.example.travelock.data.repository.FeedDetailsRepository
 import com.example.travelock.ui.screens.feed.FeedPostItem
 
-/**
-* Wire PostCard to bind against FeedPostItem with live interaction state,
-* profile summaries, destination badges, comments, and authenticated image downloads via Coil.
-*/
 private val feedDetailsRepo = FeedDetailsRepository()
 
 @Composable
@@ -39,6 +37,7 @@ fun PostCard(
     val destination = feedPostItem.destination
     val interaction = feedPostItem.interaction
     val comments = feedPostItem.comments
+    val achievementBadge = feedPostItem.achievementBadge
 
     var showComments by remember { mutableStateOf(comments.isNotEmpty()) }
     var commentText by remember { mutableStateOf("") }
@@ -108,20 +107,52 @@ fun PostCard(
                 }
             }
 
+            // Recent Achievement Banner for Shared Friend Photos
+            if (achievementBadge != null) {
+                Surface(
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    shape = MaterialTheme.shapes.small,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp)
+                        .padding(bottom = 10.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.EmojiEvents,
+                            contentDescription = "Recent Achievement",
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = achievementBadge,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    }
+                }
+            }
+
             // Post Image Banner (Coil AsyncImage with fallback to illustration)
             if (postImageBytes != null) {
                 AsyncImage(
                     model = postImageBytes,
                     contentDescription = destination?.name ?: "Post photo",
+                    contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(190.dp)
+                        .height(210.dp)
                 )
             } else {
                 HelsinkiIllustrationBanner(
                     imageKey = post.image,
                     title = destination?.name ?: "Destination Photo",
-                    height = 190.dp
+                    height = 210.dp
                 )
             }
 
