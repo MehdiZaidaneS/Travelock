@@ -14,7 +14,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 
 /**
- *Implement FeedDetailsRepository to compose Supabase repositories
+ * Implements FeedDetailsRepository to compose Supabase repositories
  * (PostRepository, PostInteractionRepository, FriendshipRepository, ProfileRepository, DestinationRepository)
  * with in-memory caching and authenticated storage downloads.
  */
@@ -32,13 +32,15 @@ class FeedDetailsRepository {
     suspend fun loadFeed(filter: FeedFilter, ownPostToView: String? = null): List<FeedPostItem> = coroutineScope {
         val recent = if (filter == FeedFilter.FRIENDS) {
             (postRepository.getFriendsFeed() + postRepository.getMyPosts(maxResults = 20))
+                .filter { it.image.isNotBlank() }
                 .distinctBy { it.postId }
-                .sortedWith(compareByDescending<Post> { it.createdAt }.thenByDescending { it.postId }).take(20)
+                .sortedWith(compareByDescending<Post> { it.createdAt }.thenByDescending { it.postId })
+                .take(20)
         } else {
             postRepository.getPublicFeed()
+                .filter { it.image.isNotBlank() }
         }
-        // An explicitly requested own post remains visible even if older than
-        // the normal page. Public filtering never reveals a friends-only post.
+
         val focused = ownPostToView?.let { postRepository.getMyPost(it) }?.takeIf {
             filter == FeedFilter.FRIENDS || it.visibility == com.example.travelock.data.model.PostVisibility.PUBLIC
         }
@@ -62,12 +64,19 @@ class FeedDetailsRepository {
                     FeedCommentItem(comment = comment, author = commentAuthor)
                 }
 
+                val achievementBadge = when {
+                    post.visitId != null && destination != null -> "Unlocked: ${destination.name}"
+                    destination != null -> "Achievement: ${destination.name}"
+                    else -> null
+                }
+
                 FeedPostItem(
                     post = post,
                     author = author,
                     destination = destination,
                     interaction = interaction,
-                    comments = commentItems
+                    comments = commentItems,
+                    achievementBadge = achievementBadge
                 )
             }
         }.map { it.await() }
@@ -75,7 +84,7 @@ class FeedDetailsRepository {
 
     suspend fun downloadPostImage(imagePath: String): ByteArray? {
         return try {
-            if (imagePath.isBlank() || imagePath.contains("Helsinki")) return null
+            if (imagePath.isBlank() || imagePath.startsWith("helsinki_")) return null
             SupabaseProvider.client.storage.from("post-photos").downloadAuthenticated(imagePath)
         } catch (e: Exception) {
             null
