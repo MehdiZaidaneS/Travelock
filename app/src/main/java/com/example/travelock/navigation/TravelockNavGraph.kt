@@ -15,9 +15,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
@@ -94,6 +96,7 @@ fun TravelockNavGraph(
 
     val context = LocalContext.current
     val visitController = rememberVisitFlowController(checkNotNull(loggedInUser).userId)
+    val mapStateHolder = key(loggedInUser.userId) { rememberSaveableStateHolder() }
     val sharePostFactory = rememberSharePostFactory(loggedInUser.userId)
     var feedPostToView by remember(loggedInUser.userId) { mutableStateOf<Post?>(null) }
     val googleSignIn = remember(context) { com.example.travelock.ui.auth.GoogleAccountSignIn(context) }
@@ -162,14 +165,14 @@ fun TravelockNavGraph(
                 title = when (currentMainRoute) {
                     BottomNavTab.HOME.route -> "Travelock"
                     BottomNavTab.FEED.route -> "Friends Feed"
-                    BottomNavTab.MAP.route -> "Helsinki Map"
+                    BottomNavTab.MAP.route -> "Map"
                     BottomNavTab.PROFILE.route -> "My Profile"
                     "notifications" -> "Notifications"
                     "edit_profile" -> "Edit Profile"
                     "friend_profile" -> "Traveler Profile"
                     else -> "Travelock"
                 },
-                activeLocationName = activeLocationName,
+                activeLocationName = activeLocationName.takeUnless { currentMainRoute == BottomNavTab.MAP.route },
                 unreadNotificationCount = unreadCount,
                 currentThemeMode = currentThemeMode,
                 onThemeModeChange = onThemeModeChange,
@@ -216,7 +219,9 @@ fun TravelockNavGraph(
                         }
                     )
 
-                    BottomNavTab.MAP.route -> MapScreen(visitActions = visitActions)
+                    BottomNavTab.MAP.route -> mapStateHolder.SaveableStateProvider(BottomNavTab.MAP.route) {
+                        MapScreen(userId = loggedInUser.userId, visitActions = visitActions)
+                    }
 
                     BottomNavTab.PROFILE.route -> ProfileScreen(
                         uiState = profileUiState,

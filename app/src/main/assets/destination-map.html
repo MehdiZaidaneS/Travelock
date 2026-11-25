@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' https://unpkg.com; style-src 'unsafe-inline' https://unpkg.com; worker-src blob:; connect-src https://tiles.openfreemap.org; img-src https://tiles.openfreemap.org blob: data:">
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.6.1/dist/maplibre-gl.css" integrity="sha384-Nq6PQ+9vJPvw7U/VfDELyrWoGQMsy0gi6QShhaSrGzkpF5KkM40csg2leky+YMTd" crossorigin="anonymous">
+  <script src="https://unpkg.com/maplibre-gl@5.6.1/dist/maplibre-gl.js" integrity="sha384-/L1njH4bbgNt9Uk3HwJ272N9fxJzRBQCxhtwGkZiqgl+Nxpq2ETUNZhNMNV1RgyW" crossorigin="anonymous"></script>
+  <style>
+    html, body { margin: 0; }
+    #map { position: fixed; inset: 0; }
+    .pin { padding: 8px; border: 0; background: none; cursor: pointer; }
+    .pin svg { display: block; width: 32px; height: 32px; border-radius: 50%; color: white; }
+    .locked svg { background: #454950; }
+    .unlocked svg { background: #00695c; }
+    .position { width: 13px; height: 13px; border-radius: 50%; border: 2px solid white; background: #1565c0; }
+    .maplibregl-ctrl-group button { width: 44px; height: 44px; }
+  </style>
+</head>
+<body>
+<div id="map" aria-label="Destination map"></div>
+<script>
+  const config = /* MAP_CONFIG */;
+  const send = (path, values = {}) => {
+    location.href = '/'+ path + '?' + new URLSearchParams(values);
+  };
+  let map;
+  let markers = [];
+  let markerData = '';
+  let dot;
+  let currentStyle = config.style;
+  let route = [];
+  let cameraSet = Boolean(config.camera);
+  let centered = cameraSet ? config.centerRequest : 0;
+  const check = '<path d="m10 16 4 4 8-9"/>';
+  const lock = '<rect x="10" y="14" width="12" height="9" rx="2"/><path d="M12 14v-2a4 4 0 0 1 8 0v2"/>';
+  const routeGeometry = coordinates => ({
+    type: 'FeatureCollection',
+    features: coordinates.length < 2 ? [] : [{
+      type: 'Feature', properties: {}, geometry: {type: 'LineString', coordinates}
+    }]
+  });
+
+  function updateMap(data) {
+    const nextMarkers = JSON.stringify(data.markers);
+    if (nextMarkers !== markerData) {
+      markerData = nextMarkers;
+      markers.forEach(marker => marker.remove());
+      markers = data.markers.map(item => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'pin ' + (item.unlocked ? 'unlocked' : 'locked');
+        button.setAttribute('aria-label', item.name + (item.unlocked ? ', unlocked' : ', locked'));
+        button.innerHTML = '<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="16" cy="16" r="15"/>' +
+          (item.unlocked ? check : lock) + '</svg>';
+        button.addEventListener('click', event => {
+          event.stopPropagation();
+          send('marker', {id: item.id});
+        });
+        return new maplibregl.Marker({element: button}).setLngLat(item.point).addTo(map);
+      });
+    }
+    if (data.position) {
+      if (!dot) {
+        const element = document.createElement('div');
+        element.className = 'position';
+        element.setAttribute('aria-label', 'Your location');
+        dot = new maplibregl.Marker({element}).setLngLat(data.position).addTo(map);
+      } else dot.setLngLat(data.position);
+    } else if (dot) {
+      dot.remove();
+      dot = undefined;
+    }
+    route = data.route;
+    map.getSource('travelock-route')?.setData(routeGeometry(route));
+    if (data.position && data.centerRequest > centered) {
+      centered = data.centerRequest;
+      cameraSet = true;
+      map.jumpTo({center: data.position, zoom: 15});
+    } else if (!cameraSet && data.markers.length) {
+      cameraSet = true;
+      const points = data.markers.map(item => item.point);
+      const bounds = points.reduce((result, point) => result.extend(point), new maplibregl.LngLatBounds());
+      map.fitBounds(bounds, {padding: 56, maxZoom: 15, duration: 0});
+    }
+  }
+
+  function setMapStyle(style) {
+    if (currentStyle === style) return;
+    currentStyle = style;
+    map.setStyle(style);
+  }
+
+  try {
+    map = new maplibregl.Map({
+      container: 'map',
+      style: config.style,
+      center: config.camera ? config.camera.slice(0, 2) : [24.9384, 60.1699],
+      zoom: config.camera ? config.camera[2] : 12,
+      dragRotate: false,
+      pitchWithRotate: false,
+      attributionControl: {compact: true}
+    });
+    map.touchZoomRotate.disableRotation();
+    map.addControl(new maplibregl.NavigationControl({showCompass: false}));
+    map.on('style.load', () => {
+      if (map.getSource('travelock-route')) return;
+      map.addSource('travelock-route', {type: 'geojson', data: routeGeometry(route)});
+      map.addLayer({
+        id: 'travelock-route',
+        source: 'travelock-route',
+        type: 'line',
+        paint: {'line-color': '#da8300', 'line-width': 4, 'line-dasharray': [2, 2]}
+      });
+    });
+    map.once('load', () => {
+      send('ready');
+      map.on('moveend', () => {
+        const center = map.getCenter();
+        send('camera', {longitude: center.lng, latitude: center.lat, zoom: map.getZoom()});
+      });
+    });
+    map.on('movestart', event => {
+      if (event.originalEvent) cameraSet = true;
+    });
+    document.addEventListener('click', event => {
+      const anchor = event.target.closest('.maplibregl-ctrl-attrib a[href]');
+      if (anchor) {
+        event.preventDefault();
+        location.href = anchor.href;
+      }
+    });
+  } catch (error) {
+    send('failed');
+  }
+</script>
+</body>
+</html>
