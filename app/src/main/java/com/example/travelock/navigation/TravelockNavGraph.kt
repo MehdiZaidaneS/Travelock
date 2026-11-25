@@ -11,8 +11,12 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -44,6 +48,7 @@ import com.example.travelock.ui.screens.profile.EditProfileScreen
 import com.example.travelock.ui.screens.profile.FriendProfileScreen
 import com.example.travelock.ui.screens.profile.ProfileScreen
 import com.example.travelock.ui.viewmodel.LocationViewModel
+import com.example.travelock.ui.viewmodel.NotificationViewModel
 import com.example.travelock.ui.viewmodel.ProfileViewModel
 import com.example.travelock.ui.visit.VisitFlowHost
 import com.example.travelock.ui.visit.rememberVisitFlowController
@@ -61,7 +66,8 @@ fun TravelockNavGraph(
     onThemeModeChange: (ThemeMode) -> Unit,
     locationViewModel: LocationViewModel,
     authViewModel: AuthViewModel = viewModel(),
-    profileViewModel: ProfileViewModel = viewModel()
+    profileViewModel: ProfileViewModel = viewModel(),
+    notificationViewModel: NotificationViewModel = viewModel()
 ) {
     val authState by authViewModel.flow.state.collectAsState()
     val ready = authState.onboarding as? ProfileOnboardingState.Ready
@@ -71,13 +77,13 @@ fun TravelockNavGraph(
             it.profile.profileImage, it.profile.createdAt)
     }
     val activeLocationId by MockSessionState.activeLocationId.collectAsState()
-    val notifications by MockSessionState.notifications.collectAsState()
 
     var currentMainRoute by remember { mutableStateOf(BottomNavTab.HOME.route) }
     var selectedFriendId by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(loggedInUser?.userId, displayUser) {
         profileViewModel.syncWithAuthUser(displayUser)
+        notificationViewModel.syncWithAuthUser(loggedInUser?.userId)
     }
 
     if (authState.page != AuthPage.READY) {
@@ -93,8 +99,10 @@ fun TravelockNavGraph(
     val scope = rememberCoroutineScope()
     val profileUiState by profileViewModel.uiState.collectAsState()
     val editProfileUiState by profileViewModel.editState.collectAsState()
+    val notificationsUiState by notificationViewModel.uiState.collectAsState()
 
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val visitController = rememberVisitFlowController(checkNotNull(loggedInUser).userId)
     val mapStateHolder = key(loggedInUser.userId) { rememberSaveableStateHolder() }
     val sharePostFactory = rememberSharePostFactory(loggedInUser.userId)
@@ -103,6 +111,25 @@ fun TravelockNavGraph(
     val snackbarHost = remember { SnackbarHostState() }
     LaunchedEffect(authState.error) {
         authState.error?.let { snackbarHost.showSnackbar(it) }
+    }
+    LaunchedEffect(notificationsUiState.snackbarMessage) {
+        notificationsUiState.snackbarMessage?.let { message ->
+            snackbarHost.showSnackbar(message)
+            notificationViewModel.clearSnackbarMessage()
+        }
+    }
+    DisposableEffect(lifecycleOwner, loggedInUser.userId, currentMainRoute) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                if (currentMainRoute == "notifications") {
+                    notificationViewModel.loadNotifications(forceRefresh = true)
+                } else {
+                    notificationViewModel.refreshUnreadCount()
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     val currentLocation by
@@ -153,9 +180,7 @@ fun TravelockNavGraph(
     val activeLocationName = remember(activeLocationId) {
         MockLocations.allLocations.find { it.locationId == activeLocationId }?.name
     }
-    val unreadCount = remember(notifications) {
-        notifications.count { !it.isRead }
-    }
+    val unreadCount = notificationsUiState.unreadCount
     val isSubScreen = currentMainRoute in listOf("notifications", "edit_profile", "friend_profile")
 
     Scaffold(
@@ -176,7 +201,10 @@ fun TravelockNavGraph(
                 unreadNotificationCount = unreadCount,
                 currentThemeMode = currentThemeMode,
                 onThemeModeChange = onThemeModeChange,
-                onNotificationsClick = { currentMainRoute = "notifications" },
+                onNotificationsClick = {
+                    currentMainRoute = "notifications"
+                    notificationViewModel.loadNotifications(forceRefresh = true)
+                },
                 showBackButton = isSubScreen,
                 onBackClick = { currentMainRoute = BottomNavTab.HOME.route }
             )
@@ -237,6 +265,7 @@ fun TravelockNavGraph(
                         },
                         onLogoutClick = {
                             profileViewModel.syncWithAuthUser(null)
+                            notificationViewModel.syncWithAuthUser(null)
                             authViewModel.flow.logout { googleSignIn.clearCredentialState() }
                         },
                         onRefresh = { profileViewModel.loadProfile(forceRefresh = true) },
@@ -266,11 +295,46 @@ fun TravelockNavGraph(
                     )
 
                     "notifications" -> NotificationsScreen(
-                        onNavigateToFeed = { currentMainRoute = BottomNavTab.FEED.route },
-                        onNavigateToUserProfile = { userId ->
-                            selectedFriendId = userId
-                            currentMainRoute = "friend_profile"
-                        }
+                        uiState = notificationsUiState,
+                        onRefresh = { notificationViewModel.loadNotifications(forceRefresh = true) },
+                        onMarkAllAsRead = { notificationViewModel.markAllAsRead() },
+                        onNotificationClick = { item ->
+                            val notif = item.notification
+                            when {
+                                item.isPostNotification -> {
+                                    notificationViewModel.openPostNotification(notif) { post ->
+                                        feedPostToView = post
+                                        currentMainRoute = BottomNavTab.FEED.route
+                                    }
+                                }
+                                notif.type == "friend_request" -> {
+                                    notificationViewModel.markAsRead(notif.notificationId)
+                                    selectedFriendId = notif.senderId
+                                    currentMainRoute = "friend_profile"
+                                }
+                                else -> {
+                                    notificationViewModel.markAsRead(notif.notificationId)
+                                }
+                            }
+                        },
+                        onAcceptFriendRequest = { item ->
+                            item.notification.friendshipId?.let { friendshipId ->
+                                notificationViewModel.respondToFriendRequest(
+                                    notificationId = item.notification.notificationId,
+                                    friendshipId = friendshipId,
+                                    accept = true,
+                                )
+                            }
+                        },
+                        onDeclineFriendRequest = { item ->
+                            item.notification.friendshipId?.let { friendshipId ->
+                                notificationViewModel.respondToFriendRequest(
+                                    notificationId = item.notification.notificationId,
+                                    friendshipId = friendshipId,
+                                    accept = false,
+                                )
+                            }
+                        },
                     )
                 }
             }
