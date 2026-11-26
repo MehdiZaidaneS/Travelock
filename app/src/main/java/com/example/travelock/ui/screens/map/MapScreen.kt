@@ -8,6 +8,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import com.example.travelock.data.model.Location
+import com.example.travelock.data.repository.LocationRepository
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -63,6 +65,7 @@ import com.example.travelock.data.model.DestinationMapStatus
 import com.example.travelock.data.model.RoutePoint
 import com.example.travelock.data.repository.DestinationMapRepository
 import com.example.travelock.data.route.RoutePlanner
+import com.example.travelock.ui.components.NextDestinationCard
 import com.example.travelock.ui.visit.VisitFlowActions
 import java.util.Locale
 import kotlinx.coroutines.CancellationException
@@ -71,6 +74,20 @@ import kotlinx.coroutines.CancellationException
 fun MapScreen(userId: String, visitActions: VisitFlowActions) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val locationRepository = remember { LocationRepository() }
+
+
+
+    var locations by remember(userId) {
+        mutableStateOf<List<Location>>(emptyList())
+    }
+    var loadingLocations by remember(userId) { mutableStateOf(true) }
+    var selectedLocationId by rememberSaveable(userId) {
+        mutableStateOf<String?>(null)
+    }
+    var showLocations by rememberSaveable(userId) {
+        mutableStateOf(false)
+    }
     val mapRepository = remember { DestinationMapRepository() }
     val locationProvider = remember(context) { DeviceLocationProvider(context) }
     var destinations by remember(userId) { mutableStateOf<List<DestinationMapItem>?>(null) }
@@ -115,11 +132,26 @@ fun MapScreen(userId: String, visitActions: VisitFlowActions) {
         onDispose { lifecycle.removeObserver(observer) }
     }
 
-    LaunchedEffect(userId, visitActions.revision, refreshDestinations) {
+    LaunchedEffect(userId) {
+        loadingLocations = true
+        try {
+            locations = locationRepository.getLocations()
+        } finally {
+            loadingLocations = false
+        }
+    }
+
+    LaunchedEffect(
+        userId,
+        visitActions.revision,
+        refreshDestinations,
+        selectedLocationId,
+    ) {
         loadingDestinations = true
         destinationError = false
+
         try {
-            val result = mapRepository.getMapData()
+            val result = mapRepository.getMapData(selectedLocationId)
             check(result.userId == userId)
             destinations = result.destinations
         } catch (error: CancellationException) {
@@ -148,6 +180,28 @@ fun MapScreen(userId: String, visitActions: VisitFlowActions) {
 
     val mapItems = destinations.orEmpty()
     val fix = location as? DeviceLocationResult.Available
+
+    // Destinations in the planned route, preserving route order.
+    val routeStops = remember(mapItems, routeIds) {
+        val itemsById = mapItems.associateBy {
+            it.destination.destinationId
+        }
+
+        routeIds.mapNotNull { itemsById[it] }
+    }
+
+// First destination in the route that hasn't been unlocked.
+    val nextDestination = routeStops.firstOrNull {
+        it.status != DestinationMapStatus.UNLOCKED
+    }
+
+// Check whether every destination in the route is unlocked.
+    val routeCompleted =
+        routeIds.isNotEmpty() &&
+                routeStops.size == routeIds.size &&
+                routeStops.all {
+                    it.status == DestinationMapStatus.UNLOCKED
+                }
     val route = remember(mapItems, routeIds, fix) {
         val itemsById = mapItems.associateBy { it.destination.destinationId }
         val stops = routeIds.mapNotNull { itemsById[it]?.destination }
@@ -226,30 +280,282 @@ fun MapScreen(userId: String, visitActions: VisitFlowActions) {
                     }
                     Button(
                         modifier = Modifier.weight(1f),
-                        enabled = mapItems.isNotEmpty(),
-                        onClick = { showDestinations = true },
+                        enabled = !loadingLocations && locations.isNotEmpty(),
+                        onClick = { showLocations = true },
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
-                    ) { Text("Destinations") }
+                    ) {
+                        Text("Locations")
+                    }
+                }
+                Button(
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = selectedLocationId != null &&
+                            mapItems.isNotEmpty() &&
+                            !loadingDestinations &&
+                            !destinationError,
+                    onClick = {
+                        showDestinations = true
+                    },
+                ) {
+                    Text("Choose destinations")
+                }
+
+                // Next destination information
+                when {
+                    routeIds.isEmpty() -> {
+                        MapMessage("Plan a route to see your next destination.")
+                    }
+
+                    loadingDestinations -> {
+                        MapMessage("Updating your route...")
+                    }
+
+                    routeCompleted -> {
+                        // All destinations are unlocked.
+                        // Keep the route visible, but hide the next destination card.
+
+                    }
+
+                    nextDestination == null -> {
+                        MapMessage("Unable to determine the next destination.")
+                    }
+
+                    nextDestination.status == DestinationMapStatus.SIGN_IN_REQUIRED -> {
+                        MapMessage("Sign in to check your destination unlock status.")
+                    }
+
+                    else -> {
+                        val destination = nextDestination.destination
+
+                        val distance = fix?.let {
+                            distanceMeters(
+                                fromLatitude = it.latitude,
+                                fromLongitude = it.longitude,
+                                toLatitude = destination.latitude.toDouble(),
+                                toLongitude = destination.longitude.toDouble()
+                            )
+                        } ?: 0.0
+
+                        NextDestinationCard(
+                            destinationName = destination.name,
+                            distanceMeters = distance,
+                            remainingStops = routeStops.count {
+                                it.status != DestinationMapStatus.UNLOCKED
+                            },
+                            onClose = {
+                                routeIds = emptyList()
+                            }
+                        )
+                    }
                 }
             }
         }
+    }
+
+    if (showLocations) {
+        MapLocationsSheet(
+            locations = locations,
+            selectedLocationId = selectedLocationId,
+            loading = loadingLocations,
+
+            onSelect = { locationId ->
+                // Save selected location
+                selectedLocationId = locationId
+
+                // Close locations sheet
+                showLocations = false
+
+                // Reset previous route selection
+                routeIds = emptyList()
+
+                // Open destinations sheet automatically
+                showDestinations = true
+            },
+
+            onDismiss = {
+                showLocations = false
+            }
+        )
     }
 
     if (showDestinations) {
         MapDestinationsSheet(
             items = mapItems,
             routeIds = routeIds,
-            routeDistance = route?.takeIf { it.legs.isNotEmpty() }?.totalDistanceMeters,
+            routeDistance = null,
             destinationError = destinationError,
             canOpenDestination = canOpenDestination,
-            onRefresh = { refreshDestinations++ },
-            onOpen = openDestination,
-            onToggleStop = { id ->
-                routeIds = if (id in routeIds) routeIds - id else routeIds + id
+
+            onRefresh = {
+                refreshDestinations++
             },
-            onClearRoute = { routeIds = emptyList() },
-            onDismiss = { showDestinations = false },
+
+            onOpen = { item ->
+                openDestination(item)
+            },
+
+            onToggleStop = { destinationId ->
+                routeIds = if (destinationId in routeIds) {
+                    routeIds - destinationId
+                } else {
+                    routeIds + destinationId
+                }
+            },
+
+            onClearRoute = {
+                routeIds = emptyList()
+            },
+
+            onCreateRoute = {
+                val selectedItems = mapItems.filter {
+                    it.destination.destinationId in routeIds
+                }
+
+                routeIds = createNearestStopOrder(
+                    items = selectedItems,
+                    startLatitude = fix?.latitude,
+                    startLongitude = fix?.longitude,
+                )
+
+                showDestinations = false
+            },
+
+            onDismiss = {
+                showDestinations = false
+            }
         )
+    }
+}
+
+private fun createNearestStopOrder(
+    items: List<DestinationMapItem>,
+    startLatitude: Double?,
+    startLongitude: Double?,
+): List<String> {
+    if (items.isEmpty()) return emptyList()
+
+    val remaining = items.toMutableList()
+    val orderedIds = mutableListOf<String>()
+
+    var currentLatitude = startLatitude
+    var currentLongitude = startLongitude
+
+    // If the user's location isn't available, start at the first destination.
+    if (currentLatitude == null || currentLongitude == null) {
+        val first = remaining.removeAt(0)
+        orderedIds += first.destination.destinationId
+        currentLatitude = first.destination.latitude.toDouble()
+        currentLongitude = first.destination.longitude.toDouble()
+    }
+
+    while (remaining.isNotEmpty()) {
+        val nearest = remaining.minByOrNull { item ->
+            distanceMeters(
+                fromLatitude = currentLatitude!!,
+                fromLongitude = currentLongitude!!,
+                toLatitude = item.destination.latitude.toDouble(),
+                toLongitude = item.destination.longitude.toDouble(),
+            )
+        } ?: break
+
+        remaining.remove(nearest)
+        orderedIds += nearest.destination.destinationId
+
+        currentLatitude = nearest.destination.latitude.toDouble()
+        currentLongitude = nearest.destination.longitude.toDouble()
+    }
+
+    return orderedIds
+}
+
+private fun distanceMeters(
+    fromLatitude: Double,
+    fromLongitude: Double,
+    toLatitude: Double,
+    toLongitude: Double,
+): Double {
+    val earthRadiusMeters = 6_371_000.0
+
+    val lat1 = Math.toRadians(fromLatitude)
+    val lat2 = Math.toRadians(toLatitude)
+    val deltaLat = Math.toRadians(toLatitude - fromLatitude)
+    val deltaLon = Math.toRadians(toLongitude - fromLongitude)
+
+    val a = kotlin.math.sin(deltaLat / 2) * kotlin.math.sin(deltaLat / 2) +
+            kotlin.math.cos(lat1) * kotlin.math.cos(lat2) *
+            kotlin.math.sin(deltaLon / 2) * kotlin.math.sin(deltaLon / 2)
+
+    return 2 * earthRadiusMeters * kotlin.math.asin(
+        kotlin.math.sqrt(a.coerceIn(0.0, 1.0))
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MapLocationsSheet(
+    locations: List<Location>,
+    selectedLocationId: String?,
+    loading: Boolean,
+    onSelect: (String?) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        LazyColumn(
+            contentPadding = PaddingValues(
+                start = 16.dp,
+                end = 16.dp,
+                bottom = 24.dp,
+            ),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            item {
+                Text(
+                    "Locations",
+                    style = MaterialTheme.typography.titleLarge,
+                )
+            }
+
+            item {
+                TextButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { onSelect(null) },
+                ) {
+                    Text(
+                        if (selectedLocationId == null) {
+                            "✓ All locations"
+                        } else {
+                            "All locations"
+                        },
+                    )
+                }
+            }
+
+            if (loading) {
+                item {
+                    CircularProgressIndicator(
+                        modifier = Modifier.padding(16.dp),
+                    )
+                }
+            } else {
+                items(
+                    items = locations,
+                    key = { it.locationId },
+                ) { location ->
+                    TextButton(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { onSelect(location.locationId) },
+                    ) {
+                        Text(
+                            if (selectedLocationId == location.locationId) {
+                                "✓ ${location.name}"
+                            } else {
+                                location.name
+                            },
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -265,6 +571,7 @@ private fun MapDestinationsSheet(
     onOpen: (DestinationMapItem) -> Unit,
     onToggleStop: (String) -> Unit,
     onClearRoute: () -> Unit,
+    onCreateRoute: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
@@ -283,6 +590,13 @@ private fun MapDestinationsSheet(
                         MapMessage("Straight-line distance: $distance")
                     }
                     TextButton(onClick = onClearRoute) { Text("Clear route") }
+
+                    Button(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = onCreateRoute
+                    ) {
+                        Text("Create route (${routeIds.size} destinations)")
+                    }
                 }
                 if (destinationError) {
                     TextButton(onClick = onRefresh) { Text("Retry loading destinations") }
