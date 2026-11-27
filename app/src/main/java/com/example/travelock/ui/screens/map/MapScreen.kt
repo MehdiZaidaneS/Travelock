@@ -69,6 +69,22 @@ import com.example.travelock.ui.components.NextDestinationCard
 import com.example.travelock.ui.visit.VisitFlowActions
 import java.util.Locale
 import kotlinx.coroutines.CancellationException
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.*
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalConfiguration
+
 
 @Composable
 fun MapScreen(userId: String, visitActions: VisitFlowActions) {
@@ -561,7 +577,7 @@ private fun MapLocationsSheet(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun MapDestinationsSheet(
+fun MapDestinationsSheet(
     items: List<DestinationMapItem>,
     routeIds: List<String>,
     routeDistance: Double?,
@@ -574,51 +590,500 @@ private fun MapDestinationsSheet(
     onCreateRoute: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        LazyColumn(
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            item {
-                Text("Destinations", style = MaterialTheme.typography.titleLarge)
-                if (routeIds.isNotEmpty()) {
-                    Text("Route draft · ${routeIds.size} stops", style = MaterialTheme.typography.titleSmall)
-                    routeDistance?.let {
-                        val locale = ConfigurationCompat.getLocales(LocalConfiguration.current)[0] ?: Locale.ROOT
-                        val distance = if (it < 1000) "${it.toInt()} m"
-                        else String.format(locale, "%.2f km", it / 1000)
-                        MapMessage("Straight-line distance: $distance")
-                    }
-                    TextButton(onClick = onClearRoute) { Text("Clear route") }
+    val colors = MaterialTheme.colorScheme
+    val typography = MaterialTheme.typography
+    val configuration = LocalConfiguration.current
 
-                    Button(
-                        modifier = Modifier.fillMaxWidth(),
-                        onClick = onCreateRoute
+    val locale = ConfigurationCompat
+        .getLocales(configuration)[0] ?: Locale.ROOT
+
+    val distanceText = routeDistance?.let {
+        if (it < 1000) {
+            "${it.toInt()} m"
+        } else {
+            String.format(locale, "%.1f km", it / 1000)
+        }
+    }
+
+    val selectedDestinations = items.filter {
+        it.destination.destinationId in routeIds
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = colors.surface,
+        dragHandle = {
+            BottomSheetDefaults.DragHandle(
+                color = colors.onSurfaceVariant.copy(alpha = 0.35f)
+            )
+        },
+        shape = RoundedCornerShape(
+            topStart = 28.dp,
+            topEnd = 28.dp
+        )
+    ) {
+        LazyColumn(
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(
+                start = 20.dp,
+                end = 20.dp,
+                bottom = 32.dp
+            ),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+
+            // HEADER
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(
+                        modifier = Modifier.weight(1f)
                     ) {
-                        Text("Create route (${routeIds.size} destinations)")
+                        Text(
+                            text = "YOUR NEXT ADVENTURE",
+                            style = typography.labelSmall,
+                            color = colors.primary,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.5.sp
+                        )
+
+                        Text(
+                            text = "Explore Helsinki",
+                            style = typography.headlineMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        Text(
+                            text = "${items.size} places waiting to be discovered",
+                            style = typography.bodyMedium,
+                            color = colors.onSurfaceVariant
+                        )
+                    }
+
+                    Surface(
+                        shape = CircleShape,
+                        color = colors.surfaceVariant,
+                        modifier = Modifier.size(44.dp)
+                    ) {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clickable(onClick = onDismiss)
+                        ) {
+                            Text(
+                                text = "✕",
+                                style = typography.titleMedium
+                            )
+                        }
                     }
                 }
-                if (destinationError) {
-                    TextButton(onClick = onRefresh) { Text("Retry loading destinations") }
-                } else if (!canOpenDestination) {
-                    CircularProgressIndicator(Modifier.size(24.dp))
+            }
+
+            // ROUTE BUILDER
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = colors.primaryContainer
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(
+                                    text = "🗺️  CREATE TRAVEL PLAN",
+                                    style = typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = colors.onPrimaryContainer
+                                )
+
+                                Spacer(Modifier.height(6.dp))
+
+                                Text(
+                                    text = if (routeIds.isEmpty()) {
+                                        "Where to go next?"
+                                    } else {
+                                        "Where to go next?"
+                                    },
+                                    style = typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = colors.onPrimaryContainer
+                                )
+                            }
+
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                RouteInfoChip(
+                                    emoji = "📍",
+                                    text = "${routeIds.size} stops"
+                                )
+
+                                if (distanceText != null) {
+                                    RouteInfoChip(
+                                        emoji = "📏",
+                                        text = distanceText
+                                    )
+                                }
+                            }
+                        }
+
+                        Button(
+                            onClick = onCreateRoute,
+                            enabled = routeIds.isNotEmpty(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(54.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = colors.primary,
+                                contentColor = colors.onPrimary
+                            )
+                        ) {
+                            Text(
+                                text = if (routeIds.isEmpty()) {
+                                    "Create my route plan"
+                                } else {
+                                    "Create my route ->"
+                                },
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        if (routeIds.isNotEmpty()) {
+                            TextButton(
+                                onClick = onClearRoute,
+                                modifier = Modifier.align(Alignment.CenterHorizontally)
+                            ) {
+                                Text("Start a new route")
+                            }
+                        }
+                    }
                 }
             }
-            items(items, key = { it.destination.destinationId }) { item ->
+
+            // SECTION TITLE
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(
+                            text = "Discover places",
+                            style = typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        Text(
+                            text = "Pick your next hidden gem",
+                            style = typography.bodyMedium,
+                            color = colors.onSurfaceVariant
+                        )
+                    }
+
+                    Surface(
+                        color = colors.secondaryContainer,
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text(
+                            text = "${items.size} places",
+                            modifier = Modifier.padding(
+                                horizontal = 12.dp,
+                                vertical = 8.dp
+                            ),
+                            style = typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = colors.onSecondaryContainer
+                        )
+                    }
+                }
+            }
+
+            // ERROR STATE
+            if (destinationError) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = colors.errorContainer
+                        ),
+                        shape = RoundedCornerShape(20.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(20.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text("😵", style = typography.headlineLarge)
+
+                            Text(
+                                text = "We lost our way!",
+                                style = typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+
+                            Text(
+                                text = "Couldn't load the destinations. Let's try again.",
+                                style = typography.bodyMedium
+                            )
+
+                            Button(onClick = onRefresh) {
+                                Text("Try again ↻")
+                            }
+                        }
+                    }
+                }
+            } else if (!canOpenDestination) {
+                item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            strokeWidth = 3.dp
+                        )
+
+                        Spacer(Modifier.width(12.dp))
+
+                        Text(
+                            text = "Finding cool places for you...",
+                            style = typography.bodyMedium
+                        )
+                    }
+                }
+            }
+
+            // DESTINATION CARDS
+            items(
+                items = items,
+                key = { it.destination.destinationId }
+            ) { item ->
+
                 val destination = item.destination
-                Card(Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(12.dp)) {
-                        Text(destination.name, style = MaterialTheme.typography.titleMedium)
-                        MapStatus(item.status)
-                        TextButton(onClick = { onToggleStop(destination.destinationId) }) {
-                            Text(if (destination.destinationId in routeIds) "Remove from route" else "Add to route")
+                val isSelected =
+                    destination.destinationId in routeIds
+
+                val isUnlocked = item.status.toString()
+                    .contains("unlocked", ignoreCase = true) ||
+                        item.status.toString()
+                            .contains("visited", ignoreCase = true)
+
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .animateContentSize(),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (isSelected) {
+                            colors.primaryContainer.copy(alpha = 0.5f)
+                        } else {
+                            colors.surfaceContainerLow
                         }
-                        OutlinedButton(onClick = { onOpen(item) }, enabled = canOpenDestination) {
-                            Text("View details")
+                    ),
+                    border = if (isSelected) {
+                        BorderStroke(
+                            width = 1.5.dp,
+                            color = colors.primary.copy(alpha = 0.6f)
+                        )
+                    } else {
+                        null
+                    }
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            Surface(
+                                modifier = Modifier.size(52.dp),
+                                shape = RoundedCornerShape(16.dp),
+                                color = colors.secondaryContainer
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text(
+                                        text = if (isUnlocked) "🎉" else "📍",
+                                        style = typography.headlineMedium
+                                    )
+                                }
+                            }
+
+                            Spacer(Modifier.width(12.dp))
+
+                            Column(
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(
+                                    text = destination.name,
+                                    style = typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+
+                                Spacer(Modifier.height(4.dp))
+
+                                MapStatus(item.status)
+                            }
+
+                            if (isSelected) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = colors.primary,
+                                    modifier = Modifier.size(30.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text(
+                                            text = "✓",
+                                            color = colors.onPrimary,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // Keep your existing destination description.
+                        if (destination.description.isNotBlank()) {
+                            Text(
+                                text = destination.description,
+                                style = typography.bodyMedium,
+                                color = colors.onSurfaceVariant,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+
+                        HorizontalDivider(
+                            color = colors.outlineVariant.copy(alpha = 0.5f)
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            OutlinedButton(
+                                onClick = { onOpen(item) },
+                                enabled = canOpenDestination,
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(14.dp)
+                            ) {
+                                Text("Learn More")
+                            }
+
+                            Button(
+                                onClick = {
+                                    onToggleStop(destination.destinationId)
+                                },
+                                modifier = Modifier.weight(1.3f),
+                                shape = RoundedCornerShape(14.dp),
+                                colors = if (isSelected) {
+                                    ButtonDefaults.buttonColors(
+                                        containerColor = colors.secondaryContainer,
+                                        contentColor = colors.onSecondaryContainer
+                                    )
+                                } else {
+                                    ButtonDefaults.buttonColors()
+                                }
+                            ) {
+                                Text(
+                                    text = if (isSelected) {
+                                        "✓ Added"
+                                    } else {
+                                        "+ Add to trip"
+                                    },
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                     }
                 }
             }
+
+            // EMPTY STATE
+            if (items.isEmpty() && !destinationError) {
+                item {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = "🏝️",
+                            style = typography.displayMedium
+                        )
+
+                        Text(
+                            text = "Adventure awaits!",
+                            style = typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        Text(
+                            text = "No destinations here yet. Try refreshing the map.",
+                            style = typography.bodyMedium,
+                            color = colors.onSurfaceVariant
+                        )
+
+                        OutlinedButton(onClick = onRefresh) {
+                            Text("Refresh destinations ↻")
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RouteInfoChip(
+    emoji: String,
+    text: String
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(
+                horizontal = 12.dp,
+                vertical = 8.dp
+            ),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(emoji)
+
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
         }
     }
 }
